@@ -7,12 +7,15 @@ import (
 	"github.com/Rom1-J/preprocessor/logger"
 	"github.com/Rom1-J/preprocessor/structs"
 	"os"
+	"path/filepath"
+	"strconv"
+	"strings"
 )
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-func Extractor(filePath string, name string, description string) ([]structs.MetadataStruct, error) {
+func Extractor(filePath string) ([]structs.MetadataStruct, error) {
 	logger.Logger.Info().Msgf("Extractor starting on: %s", filePath)
 
 	file, err := os.Open(filePath)
@@ -43,12 +46,21 @@ func Extractor(filePath string, name string, description string) ([]structs.Meta
 
 		fragments := constants.FragmentPattern.FindAllString(line, -1)
 
+		var splitPart = strings.Split(filepath.Ext(filePath), ".part")
+		var part int
+		if len(splitPart) != 2 {
+			part = -1
+		} else {
+			part, err = strconv.Atoi(splitPart[1])
+			if err != nil {
+				part = -1
+			}
+		}
+
 		metadata := structs.MetadataStruct{
-			File:        filePath,
-			Offset:      offset,
-			Name:        name,
-			Description: description,
-			Fragments:   fragments,
+			Part:      part,
+			Offset:    offset,
+			Fragments: fragments,
 		}
 
 		metadataList = append(metadataList, metadata)

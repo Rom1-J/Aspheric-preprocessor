@@ -55,7 +55,8 @@ var App = &ucli.App{
 		logger.SetLoggerLevel(cCtx.Bool("verbose"))
 
 		var outputDirectoryPath = filepath.Join(cCtx.Path("output"), uuid.New().String())
-		var metadataFilePath = filepath.Join(outputDirectoryPath, "_metadata.db")
+		var metadataFilePath = filepath.Join(outputDirectoryPath, "_metadata.ndjson")
+		var metadataInfoFilePath = filepath.Join(outputDirectoryPath, "_info.ndjson")
 
 		logger.Logger.Info().Msgf(
 			"Processing '%s' in '%s'",
@@ -70,14 +71,24 @@ var App = &ucli.App{
 			logger.Logger.Error().Msg(err.Error())
 			fmt.Println(err.Error())
 		} else {
-			var name = cCtx.String("name")
-			if name == "" {
-				name = filepath.Base(cCtx.String("input"))
+			var metadataInfo = structs.MetadataInfoStruct{
+				Name:        cCtx.String("name"),
+				Description: cCtx.String("description"),
 			}
-			var description = cCtx.String("description")
 
-			if err := process.InitDatabase(metadataFilePath); err != nil {
-				var msg = fmt.Sprintf("Error initializing metatadata database path %s: %v", metadataFilePath, err)
+			if metadataInfo.Name == "" {
+				metadataInfo.Name = filepath.Base(cCtx.String("input"))
+			}
+
+			metadataInfoFile, err := process.OpenDatabase(metadataInfoFilePath)
+			if err != nil {
+				return nil
+			}
+			if err = process.SaveMetadataInfo(metadataInfoFile, metadataInfo); err != nil {
+				return err
+			}
+			if err := metadataInfoFile.Close(); err != nil {
+				var msg = fmt.Sprintf("Error closing metadataInfo db: %v", err)
 				logger.Logger.Error().Msgf(msg)
 				fmt.Println(msg)
 
@@ -96,14 +107,14 @@ var App = &ucli.App{
 					return nil
 				}
 
-				if info.IsDir() || filepath.Base(path) == "_metadata.db" {
+				if info.IsDir() || filepath.Ext(path) == ".ndjson" {
 					return nil
 				}
 
 				wg.Add(1)
 				go func(filePath string) {
 					defer wg.Done()
-					metadataList, err := process.Extractor(filePath, name, description)
+					metadataList, err := process.Extractor(filePath)
 
 					if err != nil {
 						var msg = fmt.Sprintf("Error starting extractor for file %s: %v", filePath, err)
@@ -129,13 +140,26 @@ var App = &ucli.App{
 				return nil
 			}
 
-			db, err := process.OpenDatabase(metadataFilePath)
+			metadataFile, err := process.OpenDatabase(metadataFilePath)
 			if err != nil {
 				return nil
 			}
 
+			go func() {
+				wg.Wait()
+				close(metadataChan)
+
+				if err := metadataFile.Close(); err != nil {
+					var msg = fmt.Sprintf("Error closing metadata db: %v", err)
+					logger.Logger.Error().Msgf(msg)
+					fmt.Println(msg)
+
+					return
+				}
+			}()
+
 			for metadata := range metadataChan {
-				if err := process.SaveMetadata(db, metadata); err != nil {
+				if err := process.SaveMetadata(metadataFile, metadata); err != nil {
 					var msg = fmt.Sprintf("Error saving metadata: %v", err)
 					logger.Logger.Error().Msgf(msg)
 					fmt.Println(msg)
@@ -143,8 +167,6 @@ var App = &ucli.App{
 					return nil
 				}
 			}
-
-			wg.Wait()
 
 			logger.Logger.Info().Msg("Processed all files")
 			fmt.Println("All files processed.")

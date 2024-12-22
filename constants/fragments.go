@@ -13,7 +13,7 @@ var (
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-var domainPattern = regexp.MustCompile(`([a-zA-Z0-9-]{1,253}\.(?:` + strings.Join(TLDs, "|") + `)\b)`)
+var domainPattern = regexp.MustCompile(`([a-zA-Z0-9-.]{1,253}\.(?:` + strings.Join(TLDs, "|") + `)\b)`)
 
 var ipv4Pattern = regexp.MustCompile(`(((25[0-5]|2[0-4]\d|1\d{2}|0?\d{1,2})\b\.){3}(25[0-5]|2[0-4]\d|1\d{2}|0?\d{1,2})\b)`)
 
