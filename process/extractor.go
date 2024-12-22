@@ -45,6 +45,9 @@ func Extractor(filePath string) ([]structs.MetadataStruct, error) {
 		}
 
 		fragments := constants.FragmentPattern.FindAllString(line, -1)
+		if len(fragments) == 0 {
+			continue
+		}
 
 		var splitPart = strings.Split(filepath.Ext(filePath), ".part")
 		var part int

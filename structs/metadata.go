@@ -14,6 +14,7 @@ type MetadataStruct struct {
 type MetadataInfoStruct struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
+	Path        string `json:"path"`
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

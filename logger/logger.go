@@ -19,6 +19,6 @@ func SetLoggerLevel(verbose bool) {
 	if verbose {
 		Logger = Logger.Level(zerolog.TraceLevel)
 	} else {
-		Logger = Logger.Level(zerolog.ErrorLevel)
+		Logger = Logger.Level(zerolog.NoLevel)
 	}
 }

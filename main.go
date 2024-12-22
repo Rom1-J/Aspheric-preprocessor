@@ -1,7 +1,9 @@
 package main
 
 import (
+	"context"
 	"github.com/Rom1-J/preprocessor/cli"
+	ucli "github.com/urfave/cli/v3"
 	"os"
 )
 
@@ -9,7 +11,13 @@ import (
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 func main() {
-	if err := cli.App.Run(os.Args); err != nil {
+	cmd := &ucli.Command{
+		Commands: []*ucli.Command{
+			cli.Generate,
+			cli.Populate,
+		},
+	}
+	if err := cmd.Run(context.Background(), os.Args); err != nil {
 		return
 	}
 }

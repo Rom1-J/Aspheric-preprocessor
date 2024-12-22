@@ -1,13 +1,14 @@
 package cli
 
 import (
+	"context"
 	"fmt"
 	"github.com/Rom1-J/preprocessor/logger"
 	"github.com/Rom1-J/preprocessor/process"
 	"github.com/Rom1-J/preprocessor/structs"
 	"github.com/Rom1-J/preprocessor/utils"
 	"github.com/google/uuid"
-	ucli "github.com/urfave/cli/v2"
+	ucli "github.com/urfave/cli/v3"
 	"os"
 	"path/filepath"
 	"sync"
@@ -16,7 +17,9 @@ import (
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-var App = &ucli.App{
+var Generate = &ucli.Command{
+	Name:  "generate",
+	Usage: "Generate metadata for a file by extracting fragments.",
 	Flags: []ucli.Flag{
 		&ucli.BoolFlag{
 			Name:    "verbose",
@@ -24,13 +27,13 @@ var App = &ucli.App{
 			Usage:   "Verbose mode",
 			Value:   false,
 		},
-		&ucli.PathFlag{
+		&ucli.StringFlag{
 			Name:     "input",
 			Aliases:  []string{"i"},
-			Usage:    "Input file directory",
+			Usage:    "Input file",
 			Required: true,
 		},
-		&ucli.PathFlag{
+		&ucli.StringFlag{
 			Name:     "output",
 			Aliases:  []string{"o"},
 			Usage:    "Output directory",
@@ -50,37 +53,47 @@ var App = &ucli.App{
 			Required:    false,
 		},
 	},
-	Args: false,
-	Action: func(cCtx *ucli.Context) error {
-		logger.SetLoggerLevel(cCtx.Bool("verbose"))
+	Action: func(ctx context.Context, command *ucli.Command) error {
+		logger.SetLoggerLevel(command.Bool("verbose"))
+		logger.Logger.Info().Msgf("Log level verbose: %t", command.Bool("verbose"))
 
-		var outputDirectoryPath = filepath.Join(cCtx.Path("output"), uuid.New().String())
+		var outputDirectoryPath = filepath.Join(command.String("output"), uuid.New().String())
 		var metadataFilePath = filepath.Join(outputDirectoryPath, "_metadata.ndjson")
 		var metadataInfoFilePath = filepath.Join(outputDirectoryPath, "_info.ndjson")
 
 		logger.Logger.Info().Msgf(
 			"Processing '%s' in '%s'",
-			cCtx.String("input"),
+			command.String("input"),
 			outputDirectoryPath,
 		)
 
 		if err := utils.SplitFile(
-			cCtx.Path("input"),
+			command.String("input"),
 			outputDirectoryPath,
 		); err != nil {
 			logger.Logger.Error().Msg(err.Error())
 			fmt.Println(err.Error())
 		} else {
+			absoluteOutputDirectoryPath, err := filepath.Abs(outputDirectoryPath)
+			if err != nil {
+				var msg = fmt.Sprintf("Error getting absolute output path: %v", err)
+				logger.Logger.Error().Msgf(msg)
+				fmt.Println(msg)
+
+				return nil
+			}
+
 			var metadataInfo = structs.MetadataInfoStruct{
-				Name:        cCtx.String("name"),
-				Description: cCtx.String("description"),
+				Name:        command.String("name"),
+				Description: command.String("description"),
+				Path:        absoluteOutputDirectoryPath,
 			}
 
 			if metadataInfo.Name == "" {
-				metadataInfo.Name = filepath.Base(cCtx.String("input"))
+				metadataInfo.Name = filepath.Base(command.String("input"))
 			}
 
-			metadataInfoFile, err := process.OpenDatabase(metadataInfoFilePath)
+			metadataInfoFile, err := utils.OpenOrCreateDatabase(metadataInfoFilePath)
 			if err != nil {
 				return nil
 			}
@@ -140,7 +153,7 @@ var App = &ucli.App{
 				return nil
 			}
 
-			metadataFile, err := process.OpenDatabase(metadataFilePath)
+			metadataFile, err := utils.OpenOrCreateDatabase(metadataFilePath)
 			if err != nil {
 				return nil
 			}

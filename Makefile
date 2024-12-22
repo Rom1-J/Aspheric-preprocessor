@@ -30,3 +30,7 @@ clean:
 .PHONY: build
 build: prepare
 	go build -ldflags $(LDFLAGS) -o $(OUTPUT_SOFT)
+
+.PHONY: neo4j
+neo4j:
+	docker run -p7474:7474 -p7687:7687 -e NEO4J_AUTH=neo4j/secretgraph neo4j:latest
