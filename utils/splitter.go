@@ -15,16 +15,24 @@ import (
 func SplitFile(inputFilePath string, outputDirectoryPath string) error {
 	file, err := os.Open(inputFilePath)
 	if err != nil {
-		return fmt.Errorf("failed to open input file: %v", err)
+		var msg = fmt.Sprintf("Failed to open input file: %v", err)
+		logger.Logger.Error().Msgf(msg)
+		fmt.Println(msg)
+
+		return nil
 	}
 	defer func(file *os.File) {
 		if err := file.Close(); err != nil {
-			logger.Logger.Error().Msgf("failed to close input file: %v", err)
+			logger.Logger.Error().Msgf("Failed to close input file: %v", err)
 		}
 	}(file)
 
 	baseName := filepath.Base(inputFilePath)
 	if err = os.MkdirAll(outputDirectoryPath, 0755); err != nil {
+		var msg = fmt.Sprintf("Failed to open input file: %v", err)
+		logger.Logger.Error().Msgf(msg)
+		fmt.Println(msg)
+
 		return nil
 	}
 
@@ -43,7 +51,11 @@ func SplitFile(inputFilePath string, outputDirectoryPath string) error {
 			if err.Error() == "EOF" {
 				break
 			}
-			return fmt.Errorf("error reading file: %v", err)
+			var msg = fmt.Sprintf("Error reading file: %v", err)
+			logger.Logger.Error().Msgf(msg)
+			fmt.Println(msg)
+
+			return nil
 		}
 
 		if outputFile == nil || currentSize+int64(len(line)) > constants.ChunkSize {
@@ -61,7 +73,11 @@ func SplitFile(inputFilePath string, outputDirectoryPath string) error {
 			outputFileName := filepath.Join(outputDirectoryPath, fmt.Sprintf("%s.part%d", baseName, fileIndex))
 			outputFile, err = os.Create(outputFileName)
 			if err != nil {
-				return fmt.Errorf("failed to create output file: %v", err)
+				var msg = fmt.Sprintf("Failed to create output file: %v", err)
+				logger.Logger.Error().Msgf(msg)
+				fmt.Println(msg)
+
+				return nil
 			}
 			writer = bufio.NewWriter(outputFile)
 
@@ -73,7 +89,11 @@ func SplitFile(inputFilePath string, outputDirectoryPath string) error {
 
 		n, writeErr := writer.WriteString(line)
 		if writeErr != nil {
-			return fmt.Errorf("error writing to file: %v", writeErr)
+			var msg = fmt.Sprintf("Error writing to file: %v", writeErr)
+			logger.Logger.Error().Msgf(msg)
+			fmt.Println(msg)
+
+			return nil
 		}
 
 		currentSize += int64(n)

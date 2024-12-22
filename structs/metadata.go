@@ -1,37 +1,15 @@
 package structs
 
-import "errors"
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-type OutputMetadataTypeStruct string
-
-const (
-	TypeCSV    OutputMetadataTypeStruct = "csv"
-	TypeTXT    OutputMetadataTypeStruct = "txt"
-	TypeNDJSON OutputMetadataTypeStruct = "ndjson"
-)
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 type MetadataStruct struct {
-	File        string                   `json:"file"`
-	Offset      int                      `json:"offset"`
-	Name        string                   `json:"name"`
-	Description string                   `json:"description"`
-	Fragments   []string                 `json:"fragments"`
-	Type        OutputMetadataTypeStruct `json:"type"`
+	File        string   `json:"file"`
+	Offset      int      `json:"offset"`
+	Name        string   `json:"name"`
+	Description string   `json:"description"`
+	Fragments   []string `json:"fragments"`
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-func (t OutputMetadataTypeStruct) IsValid() error {
-	switch t {
-	case TypeCSV, TypeTXT, TypeNDJSON:
-		return nil
-	default:
-		return errors.New("invalid type")
-	}
-}
