@@ -4,16 +4,16 @@ GOOS ?= linux
 ARCH ?= $(shell uname -m)
 BUILDINFOSDET ?=
 
-SOFT_NAME    := preprocessor
-SOFT_VERSION := $(shell git describe --tags $(git rev-list --tags --max-count=1))
+SOFT_NAME     := preprocessor
+SOFT_VERSION  := $(shell (git describe --tags $(git rev-list --tags --max-count=1)) || echo "0.0.0")
 VERSION_PKG   := $(shell echo $(SOFT_VERSION) | sed 's/^v//g')
 ARCH          := x86_64
 URL           := https://github.com/Rom1-J/preprocessor
 DESCRIPTION   := Convert text, csv, sql, .. files into ndjson.
-BUILDINFOS    :=  ($(shell date +%FT%T%z)$(BUILDINFOSDET))
+BUILDINFOS    := ($(shell date +%FT%T%z)$(BUILDINFOSDET))
 LDFLAGS       := '-X main.version=$(SOFT_VERSION) -X main.buildinfos=$(BUILDINFOS)'
 
-OUTPUT_SOFT := $(DIST_DIR)$(SOFT_NAME)-$(SOFT_VERSION)-$(GOOS)-$(ARCH)$(EXTENSION)
+OUTPUT_SOFT   := $(DIST_DIR)$(SOFT_NAME)-$(SOFT_VERSION)-$(GOOS)-$(ARCH)$(EXTENSION)
 
 .PHONY: vet
 vet:

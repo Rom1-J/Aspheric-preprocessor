@@ -93,3 +93,4 @@ fabric.properties
 
 ignore
 dist/*
+output/*
