@@ -19,7 +19,7 @@ var ipv4Pattern = regexp.MustCompile(`(((25[0-5]|2[0-4]\d|1\d{2}|0?\d{1,2})\b\.)
 
 var ipv6Pattern = regexp.MustCompile(`((([0-9A-Fa-f]{1,4}:){1,6}:)|(([0-9A-Fa-f]{1,4}:){7}))([0-9A-Fa-f]{1,4})`)
 
-var emailPattern = regexp.MustCompile(`[0-9a-zA-Z-_\.+]*@([a-zA-Z0-9-.]{1,253}\.(?:` + strings.Join(TLDs, "|") + `)\b)`)
+var emailPattern = regexp.MustCompile(`([0-9a-zA-Z-_\.+]+@(?:[a-zA-Z0-9-.]{1,253}\.)+[a-zA-Z]{2,})\b`)
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
