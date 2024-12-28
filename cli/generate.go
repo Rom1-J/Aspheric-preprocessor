@@ -58,8 +58,8 @@ var Generate = &ucli.Command{
 		logger.Logger.Info().Msgf("Log level verbose: %t", command.Bool("verbose"))
 
 		var outputDirectoryPath = filepath.Join(command.String("output"), uuid.New().String())
-		var metadataFilePath = filepath.Join(outputDirectoryPath, "_metadata.ndjson")
-		var metadataInfoFilePath = filepath.Join(outputDirectoryPath, "_info.ndjson")
+		var metadataFilePath = filepath.Join(outputDirectoryPath, "_metadata.csv")
+		var metadataInfoFilePath = filepath.Join(outputDirectoryPath, "_info.csv")
 
 		logger.Logger.Info().Msgf(
 			"Processing '%s' in '%s'",
@@ -120,7 +120,7 @@ var Generate = &ucli.Command{
 					return nil
 				}
 
-				if info.IsDir() || filepath.Ext(path) == ".ndjson" {
+				if info.IsDir() || filepath.Ext(path) == ".csv" {
 					return nil
 				}
 

@@ -1,44 +1,33 @@
 package process
 
 import (
-	"encoding/json"
+	"encoding/csv"
 	"fmt"
 	"github.com/Rom1-J/preprocessor/logger"
 	"github.com/Rom1-J/preprocessor/structs"
 	"os"
+	"strconv"
 )
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 func SaveMetadataInfo(file *os.File, metadataInfo structs.MetadataInfoStruct) error {
-	jsonData, err := json.Marshal(metadataInfo)
-	if err != nil {
-		var msg = fmt.Sprintf("Error marshal metadataInfo: %v", err)
-		logger.Logger.Error().Msgf(msg)
-		fmt.Println(msg)
+	writer := csv.NewWriter(file)
+	defer writer.Flush()
 
-		return nil
+	record := []string{
+		metadataInfo.Name,
+		metadataInfo.Description,
+		metadataInfo.Path,
 	}
 
-	_, err = file.Write(jsonData)
-	if err != nil {
-		var msg = fmt.Sprintf("Error writing to db: %v", err)
+	if err := writer.Write(record); err != nil {
+		msg := fmt.Sprintf("Error writing to CSV: %v", err)
 		logger.Logger.Error().Msgf(msg)
 		fmt.Println(msg)
 
-		return nil
-
-	}
-
-	_, err = file.WriteString("\n")
-	if err != nil {
-		var msg = fmt.Sprintf("Error writing newline to db: %v", err)
-		logger.Logger.Error().Msgf(msg)
-		fmt.Println(msg)
-
-		return nil
-
+		return err
 	}
 
 	return nil
@@ -47,35 +36,24 @@ func SaveMetadataInfo(file *os.File, metadataInfo structs.MetadataInfoStruct) er
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 func SaveMetadata(file *os.File, metadata structs.MetadataStruct) error {
-	jsonData, err := json.Marshal(metadata)
-	if err != nil {
-		var msg = fmt.Sprintf("Error marshal metadata: %v", err)
-		logger.Logger.Error().Msgf(msg)
-		fmt.Println(msg)
+	writer := csv.NewWriter(file)
+	defer writer.Flush()
 
-		return nil
+	for _, fragment := range metadata.Fragments {
+		record := []string{
+			fragment,
+			strconv.Itoa(metadata.Part),
+			strconv.Itoa(metadata.Offset),
+		}
+
+		if err := writer.Write(record); err != nil {
+			msg := fmt.Sprintf("Error writing to CSV: %v", err)
+			logger.Logger.Error().Msgf(msg)
+			fmt.Println(msg)
+
+			return err
+		}
 	}
-
-	_, err = file.Write(jsonData)
-	if err != nil {
-		var msg = fmt.Sprintf("Error writing to db: %v", err)
-		logger.Logger.Error().Msgf(msg)
-		fmt.Println(msg)
-
-		return nil
-
-	}
-
-	_, err = file.WriteString("\n")
-	if err != nil {
-		var msg = fmt.Sprintf("Error writing newline to db: %v", err)
-		logger.Logger.Error().Msgf(msg)
-		fmt.Println(msg)
-
-		return nil
-
-	}
-
 	return nil
 }
 

@@ -33,4 +33,12 @@ build: prepare
 
 .PHONY: neo4j
 neo4j:
-	docker run -p7474:7474 -p7687:7687 -e NEO4J_AUTH=neo4j/secretgraph neo4j:latest
+	docker run \
+      -p7474:7474 -p7687:7687 \
+      --env=NEO4J_AUTH=neo4j/secretgraph \
+      --env=NEO4J_server_memory_heap_max__size=48G \
+      --env=NEO4J_server_memory_heap_initial__size=48G \
+      --env=NEO4J_server_memory_pagecache_size=12G \
+      --env=NEO4J_server_threads_worker__count=32 \
+      --env=NEO4J_server_jvm_additional=-XX:+UseG1GC \
+      neo4j:latest

@@ -23,68 +23,66 @@ func Populate(ctx context.Context, driver neo4j.DriverWithContext, metadata stru
 			var msg = fmt.Sprintf("Error closing neo4j session: %v", err)
 			logger.Logger.Error().Msgf(msg)
 			fmt.Println(msg)
-
 			return
 		}
 	}(session, ctx)
 
 	for _, fragment := range metadata.Fragments {
-		parts := strings.Split(fragment, ".")
+		domains := strings.Split(fragment, ".")
 
-		for i := len(parts) - 1; i > 0; i-- {
-			parent := parts[i]
-			child := parts[i-1]
-
-			_, err := session.ExecuteWrite(
-				ctx,
-				func(tx neo4j.ManagedTransaction) (any, error) {
-					query := `
-					MERGE (p:Domain {name: $parent})
-					MERGE (c:Domain {name: $child})
-					MERGE (p)-[:HAS]->(c)`
-					params := map[string]interface{}{
-						"parent": parent,
-						"child":  child,
-					}
-					return tx.Run(ctx, query, params)
-				},
-			)
-
-			if err != nil {
-				var msg = fmt.Sprintf("Error creating node relationship for %s -> %s: %v\n", parent, child, err)
-				logger.Logger.Error().Msgf(msg)
-				fmt.Println(msg)
-
-				return
-			}
+		for i, j := 0, len(domains)-1; i < j; i, j = i+1, j-1 {
+			domains[i], domains[j] = domains[j], domains[i]
 		}
 
-		leaf := parts[0]
-		_, err := session.ExecuteWrite(
-			ctx,
-			func(tx neo4j.ManagedTransaction) (any, error) {
-				query := `
-				MATCH (leaf:Domain {name: $leaf})
-				SET leaf.part = $part, leaf.offset = $offset`
-				params := map[string]interface{}{
-					"leaf":        leaf,
-					"name":        metadataInfo.Name,
-					"description": metadataInfo.Description,
-					"path":        metadataInfo.Path,
+		var parentNodeID string
 
+		for depth, domain := range domains {
+			logger.Logger.Debug().Msgf("[%s] depth=%d, domain=%s", strings.Join(domains, "."), depth, domain)
+
+			nodeID, err := session.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+				result, err := tx.Run(ctx, "MERGE (n:Domain {name: $name, depth: $depth}) "+
+					"ON CREATE SET n.created = timestamp() "+
+					"SET n += {path: $path, part: $part, offset: $offset} "+
+					"RETURN id(n)", map[string]any{
+					"name":   domain,
+					"depth":  depth,
+					"path":   metadataInfo.Path,
 					"part":   metadata.Part,
 					"offset": metadata.Offset,
+				})
+
+				if err != nil {
+					return nil, err
 				}
-				return tx.Run(ctx, query, params)
-			},
-		)
 
-		if err != nil {
-			var msg = fmt.Sprintf("Error attaching part and offset to leaf node %s: %v\n", leaf, err)
-			logger.Logger.Error().Msgf(msg)
-			fmt.Println(msg)
+				nodeID := ""
+				if result.Next(ctx) {
+					nodeID = fmt.Sprintf("%v", result.Record().Values[0])
+				}
+				return nodeID, result.Err()
+			})
 
-			return
+			if err != nil {
+				logger.Logger.Error().Msgf("Error checking/creating node for domain %s: %v", domain, err)
+				continue
+			}
+
+			if parentNodeID != "" {
+				_, err = session.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+					_, err := tx.Run(ctx, "MATCH (child:Domain {id: $childID}), (parent:Domain {id: $parentID}) "+
+						"MERGE (parent)-[:HAS]->(child)", map[string]any{
+						"childID":  nodeID,
+						"parentID": parentNodeID,
+					})
+					return nil, err
+				})
+
+				if err != nil {
+					logger.Logger.Error().Msgf("Error creating relationship between parent %s and child %s: %v", parentNodeID, nodeID, err)
+				}
+			}
+
+			parentNodeID = nodeID.(string)
 		}
 	}
 }
