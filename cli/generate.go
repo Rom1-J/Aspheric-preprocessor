@@ -11,6 +11,7 @@ import (
 	ucli "github.com/urfave/cli/v3"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sync"
 )
 
@@ -26,6 +27,13 @@ var Generate = &ucli.Command{
 			Aliases: []string{"v"},
 			Usage:   "Verbose mode",
 			Value:   false,
+		},
+		&ucli.IntFlag{
+			Name:     "threads",
+			Aliases:  []string{"t"},
+			Usage:    "Number of threads to use",
+			Value:    int64(runtime.NumCPU()),
+			Required: false,
 		},
 		&ucli.StringFlag{
 			Name:     "input",
@@ -111,37 +119,20 @@ var Generate = &ucli.Command{
 			var metadataChan = make(chan structs.MetadataStruct)
 
 			var wg sync.WaitGroup
+			maxThreads := int(command.Int("threads"))
+			semaphore := make(chan struct{}, maxThreads)
+
+			var paths []string
 			err = filepath.Walk(outputDirectoryPath, func(path string, info os.FileInfo, err error) error {
 				if err != nil {
 					var msg = fmt.Sprintf("Error accessing path %s: %v", path, err)
 					logger.Logger.Error().Msgf(msg)
 					fmt.Println(msg)
-
 					return nil
 				}
-
-				if info.IsDir() || filepath.Ext(path) == ".csv" {
-					return nil
+				if !info.IsDir() && filepath.Ext(path) != ".csv" {
+					paths = append(paths, path)
 				}
-
-				wg.Add(1)
-				go func(filePath string) {
-					defer wg.Done()
-					metadataList, err := process.Extractor(filePath)
-
-					if err != nil {
-						var msg = fmt.Sprintf("Error starting extractor for file %s: %v", filePath, err)
-						logger.Logger.Error().Msgf(msg)
-						fmt.Println(msg)
-
-						return
-					}
-
-					for _, metadata := range metadataList {
-						metadataChan <- metadata
-					}
-				}(path)
-
 				return nil
 			})
 
@@ -153,23 +144,39 @@ var Generate = &ucli.Command{
 				return nil
 			}
 
-			metadataFile, err := utils.OpenOrCreateDatabase(metadataFilePath)
-			if err != nil {
-				return nil
+			for _, path := range paths {
+				logger.Logger.Debug().Msgf("Locking slot for: %s", path)
+				semaphore <- struct{}{}
+				wg.Add(1)
+				go func(filePath string) {
+					metadataList, err := process.Extractor(filePath)
+					if err != nil {
+						var msg = fmt.Sprintf("Error starting extractor for file %s: %v", filePath, err)
+						logger.Logger.Error().Msgf(msg)
+						fmt.Println(msg)
+						return
+					}
+
+					logger.Logger.Debug().Msgf("Releasing slot for: %s", path)
+					<-semaphore
+
+					for _, metadata := range metadataList {
+						metadataChan <- metadata
+					}
+
+					wg.Done()
+				}(path)
 			}
 
 			go func() {
 				wg.Wait()
 				close(metadataChan)
-
-				if err := metadataFile.Close(); err != nil {
-					var msg = fmt.Sprintf("Error closing metadata db: %v", err)
-					logger.Logger.Error().Msgf(msg)
-					fmt.Println(msg)
-
-					return
-				}
 			}()
+
+			metadataFile, err := utils.OpenOrCreateDatabase(metadataFilePath)
+			if err != nil {
+				return nil
+			}
 
 			for metadata := range metadataChan {
 				if err := process.SaveMetadata(metadataFile, metadata); err != nil {
@@ -179,6 +186,14 @@ var Generate = &ucli.Command{
 
 					return nil
 				}
+			}
+
+			if err := metadataFile.Close(); err != nil {
+				var msg = fmt.Sprintf("Error closing metadata db: %v", err)
+				logger.Logger.Error().Msgf(msg)
+				fmt.Println(msg)
+
+				return nil
 			}
 
 			logger.Logger.Info().Msg("Processed all files")

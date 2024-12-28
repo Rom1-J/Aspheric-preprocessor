@@ -44,7 +44,12 @@ func Extractor(filePath string) ([]structs.MetadataStruct, error) {
 			break
 		}
 
-		fragments := constants.FragmentPattern.FindAllString(line, -1)
+		var fragments []string
+
+		for _, fragmentPattern := range constants.FragmentPatterns {
+			fragments = append(fragments, fragmentPattern.FindAllString(line, -1)...)
+		}
+
 		if len(fragments) == 0 {
 			continue
 		}

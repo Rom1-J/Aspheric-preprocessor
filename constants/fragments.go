@@ -23,6 +23,6 @@ var emailPattern = regexp.MustCompile(`([0-9a-zA-Z-_\.+]+@(?:[a-zA-Z0-9-.]{1,253
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-var FragmentPattern = regexp.MustCompile(strings.Join([]string{domainPattern.String(), ipv4Pattern.String(), ipv6Pattern.String(), emailPattern.String()}, "|"))
+var FragmentPatterns = []*regexp.Regexp{domainPattern, ipv4Pattern, ipv6Pattern, emailPattern}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
