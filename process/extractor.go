@@ -51,6 +51,7 @@ func Extractor(filePath string) ([]structs.MetadataStruct, error) {
 		}
 
 		if len(fragments) == 0 {
+			offset += len(line)
 			continue
 		}
 
