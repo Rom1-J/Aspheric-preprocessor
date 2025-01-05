@@ -9,6 +9,7 @@ require (
 )
 
 require (
+	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/elastic/elastic-transport-go/v8 v8.6.0 // indirect
 	github.com/elastic/go-elasticsearch/v8 v8.17.0 // indirect
 	github.com/go-logr/logr v1.4.2 // indirect
