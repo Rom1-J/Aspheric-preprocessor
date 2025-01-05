@@ -65,140 +65,148 @@ var Generate = &ucli.Command{
 		logger.SetLoggerLevel(command.Bool("verbose"))
 		logger.Logger.Info().Msgf("Log level verbose: %t", command.Bool("verbose"))
 
-		var outputDirectoryPath = filepath.Join(command.String("output"), uuid.New().String())
-		var metadataFilePath = filepath.Join(outputDirectoryPath, "_metadata.csv")
-		var metadataInfoFilePath = filepath.Join(outputDirectoryPath, "_info.csv")
+		inputFile := command.String("input")
+		outputDirectoryPath := filepath.Join(command.String("output"), uuid.New().String())
+
+		metadataFilePath := filepath.Join(outputDirectoryPath, "_metadata.csv")
+		metadataInfoFilePath := filepath.Join(outputDirectoryPath, "_info.csv")
 
 		logger.Logger.Info().Msgf(
 			"Processing '%s' in '%s'",
-			command.String("input"),
+			inputFile,
 			outputDirectoryPath,
 		)
 
 		if err := utils.SplitFile(
-			command.String("input"),
+			inputFile,
 			outputDirectoryPath,
 		); err != nil {
-			logger.Logger.Error().Msg(err.Error())
-			fmt.Println(err.Error())
-		} else {
-			absoluteOutputDirectoryPath, err := filepath.Abs(outputDirectoryPath)
-			if err != nil {
-				var msg = fmt.Sprintf("Error getting absolute output path: %v", err)
-				logger.Logger.Error().Msgf(msg)
-				fmt.Println(msg)
+			var msg = fmt.Sprintf("Error splitting file %s to %s: %v", inputFile, outputDirectoryPath, err)
+			logger.Logger.Error().Msgf(msg)
+			fmt.Println(msg)
 
-				return nil
-			}
-
-			var metadataInfo = structs.MetadataInfoStruct{
-				Name:        command.String("name"),
-				Description: command.String("description"),
-				Path:        absoluteOutputDirectoryPath,
-			}
-
-			if metadataInfo.Name == "" {
-				metadataInfo.Name = filepath.Base(command.String("input"))
-			}
-
-			metadataInfoFile, err := utils.OpenOrCreateDatabase(metadataInfoFilePath)
-			if err != nil {
-				return nil
-			}
-			if err = process.SaveMetadataInfo(metadataInfoFile, metadataInfo); err != nil {
-				return err
-			}
-			if err := metadataInfoFile.Close(); err != nil {
-				var msg = fmt.Sprintf("Error closing metadataInfo db: %v", err)
-				logger.Logger.Error().Msgf(msg)
-				fmt.Println(msg)
-
-				return nil
-			}
-
-			var metadataChan = make(chan structs.MetadataStruct)
-
-			var wg sync.WaitGroup
-			maxThreads := int(command.Int("threads"))
-			semaphore := make(chan struct{}, maxThreads)
-
-			var paths []string
-			err = filepath.Walk(outputDirectoryPath, func(path string, info os.FileInfo, err error) error {
-				if err != nil {
-					var msg = fmt.Sprintf("Error accessing path %s: %v", path, err)
-					logger.Logger.Error().Msgf(msg)
-					fmt.Println(msg)
-					return nil
-				}
-				if !info.IsDir() && filepath.Ext(path) != ".csv" {
-					paths = append(paths, path)
-				}
-				return nil
-			})
-
-			if err != nil {
-				var msg = fmt.Sprintf("Error walking the directory: %v", err)
-				logger.Logger.Error().Msgf(msg)
-				fmt.Println(msg)
-
-				return nil
-			}
-
-			for _, path := range paths {
-				logger.Logger.Debug().Msgf("Locking slot for: %s", path)
-				semaphore <- struct{}{}
-				wg.Add(1)
-				go func(filePath string) {
-					metadataList, err := process.Extractor(filePath)
-					if err != nil {
-						var msg = fmt.Sprintf("Error starting extractor for file %s: %v", filePath, err)
-						logger.Logger.Error().Msgf(msg)
-						fmt.Println(msg)
-						return
-					}
-
-					logger.Logger.Debug().Msgf("Releasing slot for: %s", path)
-					<-semaphore
-
-					for _, metadata := range metadataList {
-						metadataChan <- metadata
-					}
-
-					wg.Done()
-				}(path)
-			}
-
-			go func() {
-				wg.Wait()
-				close(metadataChan)
-			}()
-
-			metadataFile, err := utils.OpenOrCreateDatabase(metadataFilePath)
-			if err != nil {
-				return nil
-			}
-
-			for metadata := range metadataChan {
-				if err := process.SaveMetadata(metadataFile, metadata); err != nil {
-					var msg = fmt.Sprintf("Error saving metadata: %v", err)
-					logger.Logger.Error().Msgf(msg)
-					fmt.Println(msg)
-
-					return nil
-				}
-			}
-
-			if err := metadataFile.Close(); err != nil {
-				var msg = fmt.Sprintf("Error closing metadata db: %v", err)
-				logger.Logger.Error().Msgf(msg)
-				fmt.Println(msg)
-
-				return nil
-			}
-
-			logger.Logger.Info().Msg("Processed all files")
-			fmt.Println("All files processed.")
+			return fmt.Errorf(msg)
 		}
+
+		absoluteOutputDirectoryPath, err := filepath.Abs(outputDirectoryPath)
+		if err != nil {
+			var msg = fmt.Sprintf("Error getting absolute output path: %v", err)
+			logger.Logger.Error().Msgf(msg)
+			fmt.Println(msg)
+
+			return fmt.Errorf(msg)
+		}
+
+		var metadataInfo = structs.MetadataInfoStruct{
+			Name:        command.String("name"),
+			Description: command.String("description"),
+			Path:        absoluteOutputDirectoryPath,
+		}
+
+		if metadataInfo.Name == "" {
+			metadataInfo.Name = filepath.Base(inputFile)
+		}
+
+		metadataInfoFile, err := utils.OpenOrCreateDatabase(metadataInfoFilePath)
+		if err != nil {
+			return nil
+		}
+		if err = process.SaveMetadataInfo(metadataInfoFile, metadataInfo); err != nil {
+			return err
+		}
+		if err := metadataInfoFile.Close(); err != nil {
+			var msg = fmt.Sprintf("Error closing metadataInfo db: %v", err)
+			logger.Logger.Error().Msgf(msg)
+			fmt.Println(msg)
+
+			return fmt.Errorf(msg)
+		}
+
+		var metadataChan = make(chan structs.MetadataStruct)
+
+		var wg sync.WaitGroup
+		maxThreads := int(command.Int("threads"))
+		semaphore := make(chan struct{}, maxThreads)
+
+		var paths []string
+		err = filepath.Walk(outputDirectoryPath, func(path string, info os.FileInfo, err error) error {
+			if err != nil {
+				var msg = fmt.Sprintf("Error accessing path %s: %v", path, err)
+				logger.Logger.Error().Msgf(msg)
+				fmt.Println(msg)
+
+				return fmt.Errorf(msg)
+			}
+
+			if !info.IsDir() && filepath.Ext(path) != ".csv" {
+				paths = append(paths, path)
+			}
+
+			return nil
+		})
+
+		if err != nil {
+			var msg = fmt.Sprintf("Error walking the directory: %v", err)
+			logger.Logger.Error().Msgf(msg)
+			fmt.Println(msg)
+
+			return fmt.Errorf(msg)
+		}
+
+		for _, path := range paths {
+			logger.Logger.Debug().Msgf("Locking slot for: %s", path)
+			semaphore <- struct{}{}
+			wg.Add(1)
+			go func(filePath string) {
+				metadataList, err := process.Extractor(filePath)
+				if err != nil {
+					var msg = fmt.Sprintf("Error starting extractor for file %s: %v", filePath, err)
+					logger.Logger.Error().Msgf(msg)
+					fmt.Println(msg)
+					return
+				}
+
+				logger.Logger.Debug().Msgf("Releasing slot for: %s", path)
+				<-semaphore
+
+				for _, metadata := range metadataList {
+					metadataChan <- metadata
+				}
+
+				wg.Done()
+			}(path)
+		}
+
+		go func() {
+			wg.Wait()
+			close(metadataChan)
+		}()
+
+		metadataFile, err := utils.OpenOrCreateDatabase(metadataFilePath)
+		if err != nil {
+			return nil
+		}
+
+		for metadata := range metadataChan {
+			if err := process.SaveMetadata(metadataFile, metadata); err != nil {
+				var msg = fmt.Sprintf("Error saving metadata: %v", err)
+				logger.Logger.Error().Msgf(msg)
+				fmt.Println(msg)
+
+				return fmt.Errorf(msg)
+			}
+		}
+
+		if err := metadataFile.Close(); err != nil {
+			var msg = fmt.Sprintf("Error closing metadata db: %v", err)
+			logger.Logger.Error().Msgf(msg)
+			fmt.Println(msg)
+
+			return fmt.Errorf(msg)
+		}
+
+		logger.Logger.Info().Msg("Processed all files")
+		fmt.Println("All files processed.")
 
 		return nil
 	},

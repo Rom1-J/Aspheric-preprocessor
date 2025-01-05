@@ -20,7 +20,7 @@ func OpenOrCreateDatabase(metadataFilePath string) (*os.File, error) {
 			logger.Logger.Error().Msgf(msg)
 			fmt.Println(msg)
 
-			return nil, nil
+			return nil, fmt.Errorf(msg)
 		}
 	} else {
 		file, err = os.Open(metadataFilePath)
@@ -29,7 +29,7 @@ func OpenOrCreateDatabase(metadataFilePath string) (*os.File, error) {
 			logger.Logger.Error().Msgf(msg)
 			fmt.Println(msg)
 
-			return nil, nil
+			return nil, fmt.Errorf(msg)
 		}
 	}
 

@@ -24,7 +24,7 @@ func Extractor(filePath string) ([]structs.MetadataStruct, error) {
 		logger.Logger.Error().Msgf(msg)
 		fmt.Println(msg)
 
-		return nil, nil
+		return nil, fmt.Errorf(msg)
 	}
 
 	var metadataList []structs.MetadataStruct
