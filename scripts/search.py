@@ -84,7 +84,7 @@ def load_config() -> ConfigType:
         sys.exit(1)
 
     return {
-        "domain": str(config["DOMAIN"]),
+        "domain": json.loads(config["DOMAIN"]),
         "ignore_ssl": bool(config["IGNORE_SSL"]),
         "data_path": Path(config["DATA_PATH"]).expanduser(),
         "auth": auth

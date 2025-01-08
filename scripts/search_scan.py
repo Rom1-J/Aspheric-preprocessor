@@ -79,7 +79,7 @@ def load_config() -> ConfigType:
         sys.exit(1)
 
     return {
-        "domain": str(config["DOMAIN"]),
+        "domain": json.loads(config["DOMAIN"]),
         "ignore_ssl": bool(config["IGNORE_SSL"]),
         "data_path": Path(config["DATA_PATH"]).expanduser(),
         "auth": auth
@@ -148,8 +148,8 @@ def main(query: str) -> None:
     )
 
     i = 0
-    while i < 100 or input("Continue? [Y/n]: ") != "n":
-        if i == 100:
+    while i < 1_000 or input("Continue? [Y/n]: ") != "n":
+        if i == 1_000:
             i = 0
         else:
             i += 1
@@ -163,4 +163,7 @@ def main(query: str) -> None:
 
 
 if __name__ == "__main__":
-    main(sys.argv[1])
+    try:
+        main(sys.argv[1])
+    except KeyboardInterrupt:
+        sys.exit(0)
