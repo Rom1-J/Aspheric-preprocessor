@@ -7,6 +7,7 @@ import warnings
 
 from dotenv import dotenv_values
 from elasticsearch import Elasticsearch
+from elasticsearch.helpers import scan
 
 warnings.filterwarnings("ignore")
 
@@ -49,9 +50,16 @@ class ElasticsearchHitType(typing.TypedDict):
 
 # =============================================================================
 
-class FormattedHitType(typing.TypedDict):
+class SortedHitsType(typing.TypedDict):
     file: str
-    data: str
+    hits: dict[int, list[int]]
+
+
+# =============================================================================
+
+class ReadHitsType(typing.TypedDict):
+    file: str
+    hits: dict[int, list[str]]
 
 
 # =============================================================================
@@ -106,24 +114,61 @@ def get_client(config: ConfigType) -> Elasticsearch:
 # =============================================================================
 
 
-def read_results(config: ConfigType, results: list[ElasticsearchHitType]) -> list[FormattedHitType]:
-    output: list[FormattedHitType] = []
+def unify_results(
+    config: ConfigType, results: list[ElasticsearchHitType]
+) -> dict[str, SortedHitsType]:
+    output: dict[str, SortedHitsType] = {}
 
     for result in results:
-        base_path = config["data_path"] / "-".join(result["_index"].split("-")[1:])
+        bucket = "-".join(result["_index"].split("-")[1:])
+        base_path = config["data_path"] / bucket
 
-        with (base_path / "_info.csv").open("r") as f:
-            reader = csv.reader(f)
-            file_name = next(reader, ["ukn"])[0]
+        if bucket in output:
+            file_name = output[bucket]["file"]
+        else:
+            with (base_path / "_info.csv").open("r") as f:
+                reader = csv.reader(f)
+                file_name = next(reader, ["ukn"])[0]
+                output[bucket] = {
+                    "file": file_name,
+                    "hits": {}
+                }
 
-        with (
-                base_path / f"{file_name}.part{result["_source"]["part"]}"
-        ).open("r") as f:
-            f.seek(result["_source"]["offset"])
-            output.append({
-                "file": file_name,
-                "data": f.readline().strip(),
-            })
+        if (part := result["_source"]["part"]) not in output[bucket]["hits"]:
+            output[bucket]["hits"][part] = []
+
+        output[bucket]["hits"][result["_source"]["part"]].append(
+            result["_source"]["offset"]
+        )
+
+    return output
+
+
+# =============================================================================
+
+def read_results(
+    config: ConfigType, results: dict[str, SortedHitsType]
+) -> dict[str, ReadHitsType]:
+    output: dict[str, ReadHitsType] = {}
+
+    for bucket, hits in results.items():
+        base_path = config["data_path"] / bucket
+        file_name, data = hits["file"], hits["hits"]
+
+        output[bucket] = {
+            "file": file_name,
+            "hits": {}
+        }
+
+        for part, offsets in data.items():
+            output[bucket]["hits"][part] = []
+
+            for offset in offsets:
+                with (
+                    base_path / f"{file_name}.part{part}"
+                ).open("r") as f:
+                    f.seek(offset)
+                    output[bucket]["hits"][part].append(f.readline().strip())
 
     return output
 
@@ -135,18 +180,25 @@ def main(query: str) -> None:
     config = load_config()
     client = get_client(config)
 
-    result = client.search(index="bucket-*", body={
-        "query": {
-            "bool": {
-                "must": [
-                    {"term": {"tld.keyword": query.split(".")[-1]}},
-                    {"term": {"fragment": query}}
-                ]
+    result = client.search(
+        index="bucket-*",
+        body={
+            "query": {
+                "bool": {
+                    "must": [
+                        {"term": {"tld.keyword": query.split(".")[-1]}},
+                        {"term": {"fragment": query}}
+                    ]
+                }
             }
         }
-    })
+    )
 
-    data = read_results(config, result.body.get("hits", {}).get("hits", []))
+    unified_results = unify_results(
+        config, result.body.get("hits", {}).get("hits", [])
+    )
+
+    data = read_results(config, unified_results)
     print(json.dumps(data))
 
 
