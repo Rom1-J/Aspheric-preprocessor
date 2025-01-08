@@ -7,6 +7,7 @@ import warnings
 
 from dotenv import dotenv_values
 from elasticsearch import Elasticsearch
+from elasticsearch.helpers import scan
 
 warnings.filterwarnings("ignore")
 
@@ -34,36 +35,30 @@ class ConfigType(typing.TypedDict):
 
 # =============================================================================
 
-class ElasticsearchHitSourceType(typing.TypedDict):
+class ElasticsearchScanHitSourceType(typing.TypedDict):
     part: int
     offset: int
     fragment: str
     tld: str
 
-class ElasticsearchHitType(typing.TypedDict):
+
+class ElasticsearchScanHitType(typing.TypedDict):
     _index: str
     _id: str
     _score: float
-    _source: ElasticsearchHitSourceType
+    _source: ElasticsearchScanHitSourceType
+    sort: list[int]
 
 
 # =============================================================================
 
-class SortedHitsType(typing.TypedDict):
+class ReadHitType(typing.TypedDict):
     file: str
-    hits: dict[int, list[int]]
-
-
-# =============================================================================
-
-class ReadHitsType(typing.TypedDict):
-    file: str
-    hits: dict[int, list[str]]
+    line: str
 
 
 # =============================================================================
 # =============================================================================
-
 
 def load_config() -> ConfigType:
     config = dotenv_values(".env")
@@ -112,64 +107,22 @@ def get_client(config: ConfigType) -> Elasticsearch:
 
 # =============================================================================
 
+def read_hit(
+    config: ConfigType, hit: ElasticsearchScanHitType
+) -> dict[str, ReadHitType]:
+    bucket = "-".join(hit["_index"].split("-")[1:])
+    base_path = config["data_path"] / bucket
 
-def unify_results(
-    config: ConfigType, results: list[ElasticsearchHitType]
-) -> dict[str, SortedHitsType]:
-    output: dict[str, SortedHitsType] = {}
+    if file_path := next(base_path.glob(f"*.part{hit["_source"]["part"]}"), None):
+        with file_path.open("r") as f:
+            f.seek(hit["_source"]["offset"])
 
-    for result in results:
-        bucket = "-".join(result["_index"].split("-")[1:])
-        base_path = config["data_path"] / bucket
-
-        if bucket in output:
-            file_name = output[bucket]["file"]
-        else:
-            with (base_path / "_info.csv").open("r") as f:
-                reader = csv.reader(f)
-                file_name = next(reader, ["ukn"])[0]
-                output[bucket] = {
-                    "file": file_name,
-                    "hits": {}
+            return {
+                bucket: {
+                    "file": file_path.name,
+                    "line": f.readline().strip(),
                 }
-
-        if (part := result["_source"]["part"]) not in output[bucket]["hits"]:
-            output[bucket]["hits"][part] = []
-
-        output[bucket]["hits"][result["_source"]["part"]].append(
-            result["_source"]["offset"]
-        )
-
-    return output
-
-
-# =============================================================================
-
-def read_results(
-    config: ConfigType, results: dict[str, SortedHitsType]
-) -> dict[str, ReadHitsType]:
-    output: dict[str, ReadHitsType] = {}
-
-    for bucket, hits in results.items():
-        base_path = config["data_path"] / bucket
-        file_name, data = hits["file"], hits["hits"]
-
-        output[bucket] = {
-            "file": file_name,
-            "hits": {}
-        }
-
-        for part, offsets in data.items():
-            output[bucket]["hits"][part] = []
-
-            for offset in offsets:
-                with (
-                    base_path / f"{file_name}.part{part}"
-                ).open("r") as f:
-                    f.seek(offset)
-                    output[bucket]["hits"][part].append(f.readline().strip())
-
-    return output
+            }
 
 
 # =============================================================================
@@ -179,9 +132,10 @@ def main(query: str) -> None:
     config = load_config()
     client = get_client(config)
 
-    result = client.search(
+    s = scan(
+        client,
         index="bucket-*",
-        body={
+        query={
             "query": {
                 "bool": {
                     "must": [
@@ -193,12 +147,19 @@ def main(query: str) -> None:
         }
     )
 
-    unified_results = unify_results(
-        config, result.body.get("hits", {}).get("hits", [])
-    )
+    i = 0
+    while i < 100 or input("Continue? [Y/n]: ") != "n":
+        if i == 100:
+            i = 0
+        else:
+            i += 1
 
-    data = read_results(config, unified_results)
-    print(json.dumps(data))
+        hit: ElasticsearchScanHitType | None = next(s, None)
+
+        if hit is None:
+            break
+
+        print(json.dumps(read_hit(config, hit), indent=4))
 
 
 if __name__ == "__main__":
