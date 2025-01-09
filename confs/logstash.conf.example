@@ -1,0 +1,50 @@
+input {
+  file {
+    path => "/home/arch/Workspace/Aspheric/new/output.bak/*/_metadata/part*.csv"
+    start_position => "beginning"
+    sincedb_path => "/dev/null"
+    codec => plain {
+      charset => "UTF-8"
+    }
+    mode => "tail"
+  }
+}
+
+filter {
+  csv {
+    separator => ","
+    columns => ["fragment", "offset"]
+  }
+
+  grok {
+    match => { "[log][file][path]" => "/(?<uuid>[0-9a-fA-F-]+)/_metadata/part%{NUMBER:part}.csv" }
+  }
+
+  mutate {
+    copy => { "fragment" => "temp_fragment" }
+  }
+
+  mutate {
+    split => { "temp_fragment" => "." }
+    add_field => { "tld" => "%{[temp_fragment][-1]}" }
+    remove_field => ["temp_fragment"]
+  }
+
+  mutate {
+    remove_field => ["@timestamp", "host", "message", "@version", "event", "tags", "log"]
+  }
+}
+
+output {
+  elasticsearch {
+    hosts => ["https://192.168.1.211:9200", "https://192.168.1.212:9200", "https://192.168.1.213:9200"]
+    index => "test-bucket-%{uuid}"
+    ssl_certificate_verification => false
+    ssl => true
+    api_key => "..."
+    retry_max_interval => 300
+    retry_initial_interval => 30
+  }
+
+#  stdout { codec => rubydebug }
+}

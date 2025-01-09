@@ -16,8 +16,18 @@ import (
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 func Extractor(filePath string) ([]structs.MetadataStruct, error) {
-	logger.Logger.Info().Msgf("Extractor starting on: %s", filePath)
+	logger.Logger.Debug().Msgf("Extractor starting on: %s", filePath)
 
+	var (
+		metadataList []structs.MetadataStruct
+
+		err error
+	)
+
+	// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+	//
+	// Initializing file reader
+	//
 	file, err := os.Open(filePath)
 	if err != nil {
 		var msg = fmt.Sprintf("Failed to open file: %v", err)
@@ -27,8 +37,6 @@ func Extractor(filePath string) ([]structs.MetadataStruct, error) {
 		return nil, fmt.Errorf(msg)
 	}
 
-	var metadataList []structs.MetadataStruct
-
 	defer func(file *os.File) {
 		if err := file.Close(); err != nil {
 			return
@@ -37,13 +45,22 @@ func Extractor(filePath string) ([]structs.MetadataStruct, error) {
 
 	reader := bufio.NewReader(file)
 	offset := 0
+	// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
+	// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+	//
+	// Generate metadata collection
+	//
 	for {
 		line, err := reader.ReadString('\n')
 		if err != nil && len(line) == 0 {
 			break
 		}
 
+		// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+		//
+		// Extract fragments
+		//
 		var fragments []string
 
 		for _, fragmentPattern := range constants.FragmentPatterns {
@@ -54,9 +71,15 @@ func Extractor(filePath string) ([]structs.MetadataStruct, error) {
 			offset += len(line)
 			continue
 		}
+		// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
+		// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+		//
+		// Generate metadata struct
+		//
 		var splitPart = strings.Split(filepath.Ext(filePath), ".part")
 		var part int
+
 		if len(splitPart) != 2 {
 			part = -1
 		} else {
@@ -75,9 +98,11 @@ func Extractor(filePath string) ([]structs.MetadataStruct, error) {
 		metadataList = append(metadataList, metadata)
 
 		offset += len(line)
+		// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 	}
+	// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
-	logger.Logger.Info().Msgf("Extractor finished on: %s", filePath)
+	logger.Logger.Debug().Msgf("Extractor finished on: %s", filePath)
 	return metadataList, nil
 }
 

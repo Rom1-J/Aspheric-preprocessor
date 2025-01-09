@@ -23,6 +23,8 @@ import (
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 func Populate(client *elasticsearch.Client, bucketUUID string, filesPath []string) (esutil.BulkIndexerStats, error) {
+	logger.Logger.Debug().Msgf("Populate starting on: %s", bucketUUID)
+
 	var (
 		documents []*structs.DocumentStruct
 
@@ -140,7 +142,10 @@ func Populate(client *elasticsearch.Client, bucketUUID string, filesPath []strin
 	//
 	// Re-creating index
 	//
-	if res, err = client.Indices.Delete([]string{indexName}, client.Indices.Delete.WithIgnoreUnavailable(true)); err != nil {
+	if res, err = client.Indices.Delete(
+		[]string{indexName},
+		client.Indices.Delete.WithIgnoreUnavailable(true),
+	); err != nil {
 		var msg = fmt.Sprintf("Error deleting index %s: %v", indexName, err)
 		logger.Logger.Fatal().Msgf(msg)
 
@@ -200,7 +205,12 @@ func Populate(client *elasticsearch.Client, bucketUUID string, filesPath []strin
 			esutil.BulkIndexerItem{
 				Action: "index",
 				Body:   bytes.NewReader(data),
-				OnFailure: func(ctx context.Context, item esutil.BulkIndexerItem, res esutil.BulkIndexerResponseItem, err error) {
+				OnFailure: func(
+					ctx context.Context,
+					item esutil.BulkIndexerItem,
+					res esutil.BulkIndexerResponseItem,
+					err error,
+				) {
 					if err != nil {
 						logger.Logger.Error().Msgf("ERROR: %s", err)
 					} else {
@@ -229,5 +239,6 @@ func Populate(client *elasticsearch.Client, bucketUUID string, filesPath []strin
 	// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 	biStats = bi.Stats()
 
+	logger.Logger.Debug().Msgf("Populate finished on: %s", bucketUUID)
 	return biStats, nil
 }

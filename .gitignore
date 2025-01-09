@@ -98,3 +98,4 @@ venv/*
 
 *.bak
 .env
+confs/logstash.conf
