@@ -35,8 +35,8 @@ class ConfigType(typing.TypedDict):
 # =============================================================================
 
 class ElasticsearchHitSourceType(typing.TypedDict):
-    part: int
-    offset: int
+    part: str
+    offset: str
     fragment: str
     tld: str
 
@@ -166,7 +166,7 @@ def read_results(
                 with (
                     base_path / f"{file_name}.part{part}"
                 ).open("r") as f:
-                    f.seek(offset)
+                    f.seek(int(offset))
                     output[bucket]["hits"][part].append(f.readline().strip())
 
     return output
@@ -186,7 +186,15 @@ def main(query: str) -> None:
                 "bool": {
                     "must": [
                         {"term": {"tld.keyword": query.split(".")[-1]}},
-                        {"term": {"fragment": query}}
+                        {
+                            "wildcard": {
+                                "fragment.keyword": query
+                            }
+                        } if "*" in query else {
+                            "term": {
+                                "fragment": query
+                            }
+                        }
                     ]
                 }
             }

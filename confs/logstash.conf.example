@@ -2,7 +2,7 @@ input {
   file {
     path => "/home/arch/Workspace/Aspheric/new/output.bak/*/_metadata/part*.csv"
     start_position => "beginning"
-    sincedb_path => "/dev/null"
+    sincedb_path => "/home/arch/Workspace/Aspheric/new/confs/sincedb"
     codec => plain {
       charset => "UTF-8"
     }
@@ -21,6 +21,7 @@ filter {
   }
 
   mutate {
+    add_field => { "[@metadata][index_name]" => "v2-bucket-%{uuid}" }
     copy => { "fragment" => "temp_fragment" }
   }
 
@@ -31,14 +32,18 @@ filter {
   }
 
   mutate {
-    remove_field => ["@timestamp", "host", "message", "@version", "event", "tags", "log"]
+    convert => {
+      "offset" => "integer"
+      "part" => "integer"
+    }
+    remove_field => ["@timestamp", "host", "message", "@version", "event", "tags", "log", "uuid"]
   }
 }
 
 output {
   elasticsearch {
     hosts => ["https://192.168.1.211:9200", "https://192.168.1.212:9200", "https://192.168.1.213:9200"]
-    index => "test-bucket-%{uuid}"
+    index => "%{[@metadata][index_name]}"
     ssl_certificate_verification => false
     ssl => true
     api_key => "..."

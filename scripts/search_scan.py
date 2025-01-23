@@ -14,6 +14,12 @@ warnings.filterwarnings("ignore")
 # =============================================================================
 # =============================================================================
 
+CHUNK_SIZE = 1_000
+
+
+# =============================================================================
+# =============================================================================
+
 
 class ConfigApiKeyType(typing.TypedDict):
     type: typing.Literal["apikey"]
@@ -110,11 +116,11 @@ def get_client(config: ConfigType) -> Elasticsearch:
 def read_hit(
     config: ConfigType, hit: ElasticsearchScanHitType
 ) -> dict[str, ReadHitType]:
-    bucket = "-".join(hit["_index"].split("-")[1:])
+    bucket = "-".join(hit["_index"].split("-")[2:])
     base_path = config["data_path"] / bucket
 
     if file_path := next(base_path.glob(f"*.part{hit["_source"]["part"]}"), None):
-        with file_path.open("r") as f:
+        with file_path.open("rb") as f:
             f.seek(hit["_source"]["offset"])
 
             return {
@@ -134,13 +140,22 @@ def main(query: str) -> None:
 
     s = scan(
         client,
-        index="bucket-*",
+        index="v2-bucket-*",
+        scroll="10m",
         query={
             "query": {
                 "bool": {
                     "must": [
                         {"term": {"tld.keyword": query.split(".")[-1]}},
-                        {"term": {"fragment": query}}
+                        {
+                            "wildcard": {
+                                "fragment.keyword": query
+                            }
+                        } if "*" in query else {
+                            "term": {
+                                "fragment": query
+                            }
+                        }
                     ]
                 }
             }
@@ -148,8 +163,8 @@ def main(query: str) -> None:
     )
 
     i = 0
-    while i < 1_000 or input("Continue? [Y/n]: ") != "n":
-        if i == 1_000:
+    while i < CHUNK_SIZE or input("Continue? [Y/n]: ") != "n":
+        if i == CHUNK_SIZE:
             i = 0
         else:
             i += 1
@@ -159,7 +174,7 @@ def main(query: str) -> None:
         if hit is None:
             break
 
-        print(json.dumps(read_hit(config, hit), indent=4))
+        print(read_hit(config, hit))
 
 
 if __name__ == "__main__":

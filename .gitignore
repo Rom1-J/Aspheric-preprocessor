@@ -99,3 +99,4 @@ venv/*
 *.bak
 .env
 confs/logstash.conf
+confs/sincedb
