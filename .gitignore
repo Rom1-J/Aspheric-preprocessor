@@ -97,6 +97,8 @@ output/*
 venv/*
 
 *.bak
+*.old
 .env
 confs/logstash.conf
 confs/sincedb
+smol

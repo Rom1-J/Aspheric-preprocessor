@@ -7,7 +7,6 @@ import (
 	"github.com/Rom1-J/preprocessor/process"
 	"github.com/Rom1-J/preprocessor/structs"
 	"github.com/Rom1-J/preprocessor/utils"
-	"github.com/google/uuid"
 	ucli "github.com/urfave/cli/v3"
 	"os"
 	"path/filepath"
@@ -18,9 +17,9 @@ import (
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-var Generate = &ucli.Command{
-	Name:  "generate",
-	Usage: "Generate metadata for a file by extracting fragments.",
+var Extract = &ucli.Command{
+	Name:  "extract",
+	Usage: "Extract metadata from .part in given directory.",
 	Flags: []ucli.Flag{
 		&ucli.BoolFlag{
 			Name:    "verbose",
@@ -38,57 +37,24 @@ var Generate = &ucli.Command{
 		&ucli.StringFlag{
 			Name:     "input",
 			Aliases:  []string{"i"},
-			Usage:    "Input file",
+			Usage:    "Input directory",
 			Required: true,
-		},
-		&ucli.StringFlag{
-			Name:     "output",
-			Aliases:  []string{"o"},
-			Usage:    "Output directory",
-			Value:    "./output",
-			Required: false,
-		},
-		&ucli.StringFlag{
-			Name:        "name",
-			Usage:       "Name to be registered",
-			DefaultText: "",
-			Required:    false,
-		},
-		&ucli.StringFlag{
-			Name:        "description",
-			Usage:       "Description to be registered",
-			DefaultText: "",
-			Required:    false,
 		},
 	},
 	Action: func(ctx context.Context, command *ucli.Command) error {
 		logger.SetLoggerLevel(command.Bool("verbose"))
 		logger.Logger.Info().Msgf("Log level verbose: %t", command.Bool("verbose"))
 
-		inputFile := command.String("input")
-		outputDirectoryPath := filepath.Join(command.String("output"), uuid.New().String())
+		inputDirectory := command.String("input")
 
-		metadataFilePath := filepath.Join(outputDirectoryPath, "_metadata.csv")
-		metadataInfoFilePath := filepath.Join(outputDirectoryPath, "_info.csv")
+		metadataFilePath := filepath.Join(inputDirectory, "_metadata.csv")
 
 		logger.Logger.Info().Msgf(
-			"Processing '%s' in '%s'",
-			inputFile,
-			outputDirectoryPath,
+			"Processing '%s'",
+			inputDirectory,
 		)
 
-		if err := utils.SplitFile(
-			inputFile,
-			outputDirectoryPath,
-		); err != nil {
-			var msg = fmt.Sprintf("Error splitting file %s to %s: %v", inputFile, outputDirectoryPath, err)
-			logger.Logger.Error().Msgf(msg)
-			fmt.Println(msg)
-
-			return fmt.Errorf(msg)
-		}
-
-		absoluteOutputDirectoryPath, err := filepath.Abs(outputDirectoryPath)
+		absoluteOutputDirectoryPath, err := filepath.Abs(inputDirectory)
 		if err != nil {
 			var msg = fmt.Sprintf("Error getting absolute output path: %v", err)
 			logger.Logger.Error().Msgf(msg)
@@ -104,22 +70,7 @@ var Generate = &ucli.Command{
 		}
 
 		if metadataInfo.Name == "" {
-			metadataInfo.Name = filepath.Base(inputFile)
-		}
-
-		metadataInfoFile, err := utils.OpenOrCreateDatabase(metadataInfoFilePath)
-		if err != nil {
-			return nil
-		}
-		if err = process.SaveMetadataInfo(metadataInfoFile, metadataInfo); err != nil {
-			return err
-		}
-		if err := metadataInfoFile.Close(); err != nil {
-			var msg = fmt.Sprintf("Error closing metadataInfo db: %v", err)
-			logger.Logger.Error().Msgf(msg)
-			fmt.Println(msg)
-
-			return fmt.Errorf(msg)
+			metadataInfo.Name = filepath.Base(inputDirectory)
 		}
 
 		var metadataChan = make(chan structs.MetadataStruct)
@@ -129,7 +80,7 @@ var Generate = &ucli.Command{
 		semaphore := make(chan struct{}, maxThreads)
 
 		var paths []string
-		err = filepath.Walk(outputDirectoryPath, func(path string, info os.FileInfo, err error) error {
+		err = filepath.Walk(inputDirectory, func(path string, info os.FileInfo, err error) error {
 			if err != nil {
 				var msg = fmt.Sprintf("Error accessing path %s: %v", path, err)
 				logger.Logger.Error().Msgf(msg)

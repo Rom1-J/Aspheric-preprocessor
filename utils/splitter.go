@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/Rom1-J/preprocessor/constants"
 	"github.com/Rom1-J/preprocessor/logger"
+	"github.com/Rom1-J/preprocessor/structs"
 	"os"
 	"path/filepath"
 )
@@ -12,7 +13,7 @@ import (
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-func SplitFile(inputFilePath string, outputDirectoryPath string) error {
+func SplitFile(inputFilePath string, outputDirectoryPath string) (structs.SplitFileStruct, error) {
 	logger.Logger.Debug().Msgf("SplitFile starting on: %s", inputFilePath)
 
 	var (
@@ -20,6 +21,8 @@ func SplitFile(inputFilePath string, outputDirectoryPath string) error {
 		fileIndex   int
 		outputFile  *os.File
 		writer      *bufio.Writer
+
+		lines int
 
 		err error
 	)
@@ -33,7 +36,7 @@ func SplitFile(inputFilePath string, outputDirectoryPath string) error {
 		var msg = fmt.Sprintf("Failed to open input file: %v", err)
 		logger.Logger.Error().Msgf(msg)
 
-		return err
+		return structs.SplitFileStruct{}, err
 	}
 
 	defer func(file *os.File) {
@@ -54,7 +57,7 @@ func SplitFile(inputFilePath string, outputDirectoryPath string) error {
 		var msg = fmt.Sprintf("Failed to open input file: %v", err)
 		logger.Logger.Error().Msgf(msg)
 
-		return err
+		return structs.SplitFileStruct{}, err
 	}
 	// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
@@ -64,6 +67,7 @@ func SplitFile(inputFilePath string, outputDirectoryPath string) error {
 	//
 	for {
 		line, err := reader.ReadString('\n')
+		lines += 1
 		if err != nil {
 			if err.Error() == "EOF" {
 				break
@@ -71,7 +75,7 @@ func SplitFile(inputFilePath string, outputDirectoryPath string) error {
 			var msg = fmt.Sprintf("Error reading file: %v", err)
 			logger.Logger.Error().Msgf(msg)
 
-			return err
+			return structs.SplitFileStruct{}, err
 		}
 
 		// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
@@ -81,12 +85,12 @@ func SplitFile(inputFilePath string, outputDirectoryPath string) error {
 		if outputFile == nil || currentSize+int64(len(line)) > constants.ChunkSize {
 			if writer != nil {
 				if err := writer.Flush(); err != nil {
-					return err
+					return structs.SplitFileStruct{}, err
 				}
 			}
 			if outputFile != nil {
 				if err := outputFile.Close(); err != nil {
-					return err
+					return structs.SplitFileStruct{}, err
 				}
 			}
 
@@ -96,7 +100,7 @@ func SplitFile(inputFilePath string, outputDirectoryPath string) error {
 				var msg = fmt.Sprintf("Failed to create output file: %v", err)
 				logger.Logger.Error().Msgf(msg)
 
-				return err
+				return structs.SplitFileStruct{}, err
 			}
 			writer = bufio.NewWriter(outputFile)
 
@@ -112,7 +116,7 @@ func SplitFile(inputFilePath string, outputDirectoryPath string) error {
 			var msg = fmt.Sprintf("Error writing to file: %v", writeErr)
 			logger.Logger.Error().Msgf(msg)
 
-			return err
+			return structs.SplitFileStruct{}, err
 		}
 
 		currentSize += int64(n)
@@ -125,16 +129,19 @@ func SplitFile(inputFilePath string, outputDirectoryPath string) error {
 	//
 	if writer != nil {
 		if err := writer.Flush(); err != nil {
-			return err
+			return structs.SplitFileStruct{}, err
 		}
 	}
 	if outputFile != nil {
 		if err := outputFile.Close(); err != nil {
-			return err
+			return structs.SplitFileStruct{}, err
 		}
 	}
 	// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
 	logger.Logger.Info().Msgf("File split into %d chunks.", fileIndex)
-	return nil
+	return structs.SplitFileStruct{
+		Lines: lines,
+		Parts: fileIndex,
+	}, nil
 }

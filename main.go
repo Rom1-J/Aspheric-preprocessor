@@ -13,7 +13,8 @@ import (
 func main() {
 	cmd := &ucli.Command{
 		Commands: []*ucli.Command{
-			cli.Generate,
+			cli.Chunkify,
+			cli.Extract,
 			cli.Populate,
 		},
 	}

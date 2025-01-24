@@ -20,6 +20,8 @@ func SaveMetadataInfo(file *os.File, metadataInfo structs.MetadataInfoStruct) er
 		metadataInfo.Name,
 		metadataInfo.Description,
 		metadataInfo.Path,
+		strconv.Itoa(metadataInfo.Lines),
+		strconv.Itoa(metadataInfo.Parts),
 	}
 
 	if err := writer.Write(record); err != nil {
