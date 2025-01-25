@@ -2,11 +2,11 @@ package process
 
 import (
 	"encoding/csv"
-	"fmt"
 	"github.com/Rom1-J/preprocessor/logger"
 	"github.com/Rom1-J/preprocessor/structs"
 	"os"
 	"strconv"
+	"strings"
 )
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -25,11 +25,8 @@ func SaveMetadataInfo(file *os.File, metadataInfo structs.MetadataInfoStruct) er
 	}
 
 	if err := writer.Write(record); err != nil {
-		msg := fmt.Sprintf("Error writing to CSV: %v", err)
-		logger.Logger.Error().Msgf(msg)
-		fmt.Println(msg)
-
-		return err
+		logger.Logger.Error().Msgf("Error writing to CSV: %v", err)
+		return nil
 	}
 
 	return nil
@@ -41,20 +38,14 @@ func SaveMetadata(file *os.File, metadata structs.MetadataStruct) error {
 	writer := csv.NewWriter(file)
 	defer writer.Flush()
 
-	for _, fragment := range metadata.Fragments {
-		record := []string{
-			fragment,
-			strconv.Itoa(metadata.Part),
-			strconv.Itoa(metadata.Offset),
-		}
-
-		if err := writer.Write(record); err != nil {
-			msg := fmt.Sprintf("Error writing to CSV: %v", err)
-			logger.Logger.Error().Msgf(msg)
-			fmt.Println(msg)
-
-			return err
-		}
+	if err := writer.Write([]string{
+		metadata.File,
+		strings.Join(metadata.Emails, "|"),
+		strings.Join(metadata.IPs, "|"),
+		strings.Join(metadata.Domains, "|"),
+	}); err != nil {
+		logger.Logger.Error().Msgf("Error writing to CSV: %v", err)
+		return nil
 	}
 	return nil
 }

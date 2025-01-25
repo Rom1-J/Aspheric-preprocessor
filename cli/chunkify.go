@@ -75,131 +75,136 @@ var Chunkify = &ucli.Command{
 			Required: false,
 		},
 	},
-	Action: func(ctx context.Context, command *ucli.Command) error {
-		logger.SetLoggerLevel(command.Bool("verbose"))
-		logger.Logger.Info().Msgf("Log level verbose: %t", command.Bool("verbose"))
+	Action: chunkify,
+}
 
-		var (
-			inputList []string
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-			err error
-		)
+func chunkify(ctx context.Context, command *ucli.Command) error {
+	logger.SetLoggerLevel(command.Bool("verbose"))
+	logger.Logger.Info().Msgf("Log level verbose: %t", command.Bool("verbose"))
 
-		// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-		//
-		// Retrieving input descriptors
-		//
-		inputFiles := command.StringSlice("input")
-		inputDirectories := command.StringSlice("directory")
+	var (
+		inputList []string
 
-		inputList = append(inputList, inputFiles...)
+		err error
+	)
 
-		for _, directory := range inputDirectories {
-			if err = filepath.Walk(directory, func(path string, info os.FileInfo, err error) error {
-				if err != nil {
-					return err
-				}
-				if !info.IsDir() {
-					inputList = append(inputList, path)
-				}
-				return nil
-			}); err != nil {
+	// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+	//
+	// Retrieving input descriptors
+	//
+	inputFiles := command.StringSlice("input")
+	inputDirectories := command.StringSlice("directory")
+
+	inputList = append(inputList, inputFiles...)
+
+	for _, directory := range inputDirectories {
+		if err = filepath.Walk(directory, func(path string, info os.FileInfo, err error) error {
+			if err != nil {
 				return err
 			}
+			if !info.IsDir() {
+				inputList = append(inputList, path)
+			}
+			return nil
+		}); err != nil {
+			return err
 		}
+	}
 
-		logger.Logger.Debug().Msgf("Input files: %v", inputList)
+	logger.Logger.Debug().Msgf("Input files: %v", inputList)
 
-		logger.Logger.Info().Msgf("Chunkifing %d files", len(inputList))
-		// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+	logger.Logger.Info().Msgf("Chunkifing %d files", len(inputList))
+	// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
-		// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-		//
-		// Chunkify files
-		//
-		var wg sync.WaitGroup
-		maxThreads := int(command.Int("threads"))
-		semaphore := make(chan struct{}, maxThreads)
+	// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+	//
+	// Chunkify files
+	//
+	var wg sync.WaitGroup
+	maxThreads := int(command.Int("threads"))
+	semaphore := make(chan struct{}, maxThreads)
 
-		for _, inputFile := range inputList {
-			logger.Logger.Debug().Msgf("Locking slot for: %s", inputFile)
-			semaphore <- struct{}{}
-			wg.Add(1)
+	for _, inputFile := range inputList {
+		logger.Logger.Debug().Msgf("Locking slot for: %s", inputFile)
+		semaphore <- struct{}{}
+		wg.Add(1)
 
-			go func(filePath string) {
-				defer func() {
-					logger.Logger.Debug().Msgf("Releasing slot for: %s", filePath)
-					<-semaphore
-					wg.Done()
-				}()
+		go func(filePath string) {
+			defer func() {
+				logger.Logger.Debug().Msgf("Releasing slot for: %s", filePath)
+				<-semaphore
+				wg.Done()
+			}()
 
-				// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-				//
-				// Retrieving output descriptor
-				//
-				outputDirectoryPath := filepath.Join(command.String("output"), uuid.New().String())
-				metadataInfoFilePath := filepath.Join(outputDirectoryPath, "_info.csv")
+			// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+			//
+			// Retrieving output descriptor
+			//
+			outputDirectoryPath := filepath.Join(command.String("output"), uuid.New().String())
+			metadataInfoFilePath := filepath.Join(outputDirectoryPath, "_info.csv")
 
-				absoluteOutputDirectoryPath, err := filepath.Abs(outputDirectoryPath)
-				if err != nil {
-					logger.Logger.Error().Msgf("Error getting absolute output path: %v", err)
+			absoluteOutputDirectoryPath, err := filepath.Abs(outputDirectoryPath)
+			if err != nil {
+				logger.Logger.Error().Msgf("Error getting absolute output path: %v", err)
 
-					return
-				}
-				// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+				return
+			}
+			// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
-				stats, err := utils.SplitFile(
-					filePath,
-					outputDirectoryPath,
-				)
-				if err != nil {
-					logger.Logger.Error().Msgf("Error splitting file %s to %s: %v", filePath, outputDirectoryPath, err)
+			stats, err := utils.SplitFile(
+				filePath,
+				outputDirectoryPath,
+			)
+			if err != nil {
+				logger.Logger.Error().Msgf("Error splitting file %s to %s: %v", filePath, outputDirectoryPath, err)
 
-					return
-				}
+				return
+			}
 
-				// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-				//
-				// Generating metadata
-				//
-				var metadataInfo = structs.MetadataInfoStruct{
-					Name:        command.String("name"),
-					Description: command.String("description"),
-					Path:        absoluteOutputDirectoryPath,
-					Lines:       stats.Lines,
-					Parts:       stats.Parts,
-				}
+			// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+			//
+			// Generating metadata
+			//
+			var metadataInfo = structs.MetadataInfoStruct{
+				Name:        command.String("name"),
+				Description: command.String("description"),
+				Path:        absoluteOutputDirectoryPath,
+				Lines:       stats.Lines,
+				Parts:       stats.Parts,
+			}
 
-				if metadataInfo.Name == "" {
-					metadataInfo.Name = filepath.Base(filePath)
-				}
-				// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+			if metadataInfo.Name == "" {
+				metadataInfo.Name = filepath.Base(filePath)
+			}
+			// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
-				// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-				//
-				// Saving metadata
-				//
-				metadataInfoFile, err := utils.OpenOrCreateDatabase(metadataInfoFilePath)
-				if err != nil {
-					return
-				}
-				if err = process.SaveMetadataInfo(metadataInfoFile, metadataInfo); err != nil {
-					return
-				}
-				if err := metadataInfoFile.Close(); err != nil {
-					logger.Logger.Error().Msgf("Error closing metadataInfo db: %v", err)
+			// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+			//
+			// Saving metadata
+			//
+			metadataInfoFile, err := utils.OpenOrCreateDatabase(metadataInfoFilePath)
+			if err != nil {
+				return
+			}
+			if err = process.SaveMetadataInfo(metadataInfoFile, metadataInfo); err != nil {
+				return
+			}
+			if err := metadataInfoFile.Close(); err != nil {
+				logger.Logger.Error().Msgf("Error closing metadataInfo db: %v", err)
 
-					return
-				}
-				// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-			}(inputFile)
-		}
-		// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+				return
+			}
+			// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+		}(inputFile)
+	}
+	// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
-		wg.Wait()
+	wg.Wait()
 
-		logger.Logger.Info().Msg("Done!")
+	logger.Logger.Info().Msg("Done!")
 
-		return nil
-	},
+	return nil
 }
