@@ -199,6 +199,8 @@ func generate(ctx context.Context, command *ucli.Command) error {
 	}
 	// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
+	wg.Wait()
+
 	logger.Logger.Info().Msg("Done!")
 
 	return nil
