@@ -102,114 +102,102 @@ func generate(ctx context.Context, command *ucli.Command) error {
 	semaphore := make(chan struct{}, maxThreads)
 
 	for _, inputDirectory := range inputList {
-		logger.Logger.Debug().Msgf("Locking external slot for: %s", inputDirectory)
-		semaphore <- struct{}{}
-		wg.Add(1)
+		// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+		//
+		// Opening output descriptor
+		//
+		metadataFilePath := filepath.Join(inputDirectory, "_metadata.csv")
 
-		go func(directoryPath string) {
-			defer func() {
-				logger.Logger.Debug().Msgf("Releasing external slot for: %s", directoryPath)
-				<-semaphore
-				wg.Done()
-			}()
+		metadataFile, err := utils.OpenOrCreateDatabase(metadataFilePath)
+		if err != nil {
+			continue
+		}
+		// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
-			// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-			//
-			// Opening output descriptor
-			//
-			metadataFilePath := filepath.Join(directoryPath, "_metadata.csv")
-
-			metadataFile, err := utils.OpenOrCreateDatabase(metadataFilePath)
+		// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+		//
+		// Retrieving .partX paths
+		//
+		var paths []string
+		err = filepath.Walk(inputDirectory, func(path string, info os.FileInfo, err error) error {
 			if err != nil {
-				return
-			}
-			// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-
-			// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-			//
-			// Retrieving .partX paths
-			//
-			var paths []string
-			err = filepath.Walk(directoryPath, func(path string, info os.FileInfo, err error) error {
-				if err != nil {
-					logger.Logger.Error().Msgf("Error accessing path %s: %v", path, err)
-					return nil
-				}
-
-				if !info.IsDir() && filepath.Ext(path) != ".csv" {
-					paths = append(paths, path)
-				}
-
+				logger.Logger.Error().Msgf("Error accessing path %s: %v", path, err)
 				return nil
-			})
-
-			if err != nil {
-				logger.Logger.Error().Msgf("Error walking the directory: %v", err)
-				return
 			}
-			// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
-			// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-			//
-			// Processing paths
-			//
-			for _, path := range paths {
-				logger.Logger.Debug().Msgf("Locking internal slot for: %s", path)
-				semaphore <- struct{}{}
-				wg.Add(1)
-
-				go func(filePath string) {
-					defer func() {
-						logger.Logger.Debug().Msgf("Releasing internal slot for: %s", filePath)
-						<-semaphore
-						wg.Done()
-					}()
-
-					// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-					//
-					// Extracting metadata from .partX
-					//
-					metadataChan, err := process.Extractor(path)
-					if err != nil {
-						logger.Logger.Error().Msgf("Error starting extractor for file %s: %v", path, err)
-						return
-					}
-					// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-
-					// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-					//
-					// Saving metadata
-					//
-					for metadata := range metadataChan {
-						if err := process.SaveMetadata(metadataFile, metadata); err != nil {
-							logger.Logger.Error().Msgf("Error saving metadata: %v", err)
-
-							return
-						}
-					}
-					// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-				}(path)
+			if !info.IsDir() && filepath.Ext(path) != ".csv" {
+				paths = append(paths, path)
 			}
-			// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
-			// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-			//
-			// Closing  output descriptor
-			//
-			defer func(metadataFile *os.File) {
-				err := metadataFile.Close()
+			return nil
+		})
+
+		if err != nil {
+			logger.Logger.Error().Msgf("Error walking the directory: %v", err)
+			continue
+		}
+		// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+		// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+		//
+		// Processing paths
+		//
+		for _, path := range paths {
+			logger.Logger.Debug().Msgf("Locking slot for: %s", path)
+			semaphore <- struct{}{}
+			wg.Add(1)
+
+			go func(filePath string) {
+				defer func() {
+					logger.Logger.Debug().Msgf("Releasing slot for: %s", filePath)
+					<-semaphore
+					wg.Done()
+				}()
+
+				// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+				//
+				// Extracting metadata from .partX
+				//
+				metadataChan, err := process.Extractor(path)
 				if err != nil {
-					logger.Logger.Error().Msgf("Error closing metadata db: %v", err)
-
+					logger.Logger.Error().Msgf("Error starting extractor for file %s: %v", path, err)
 					return
 				}
-			}(metadataFile)
-			// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-		}(inputDirectory)
+				// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+				// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+				//
+				// Saving metadata
+				//
+				for metadata := range metadataChan {
+					if err := process.SaveMetadata(metadataFile, metadata); err != nil {
+						logger.Logger.Error().Msgf("Error saving metadata: %v", err)
+
+						return
+					}
+				}
+				// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+			}(path)
+		}
+		// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+		// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+		//
+		// Closing  output descriptor
+		//
+		go func() {
+			wg.Wait()
+
+			err = metadataFile.Close()
+			if err != nil {
+				logger.Logger.Error().Msgf("Error closing metadata db: %v", err)
+
+				return
+			}
+		}()
+		// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 	}
 	// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-
-	wg.Wait()
 
 	logger.Logger.Info().Msg("Done!")
 
