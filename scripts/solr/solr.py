@@ -44,7 +44,7 @@ async def commit_changes(session: aiohttp.ClientSession) -> None:
 
 
 async def main() -> None:
-    parts = list(Path("../output").glob("**/*.part*"))
+    parts = list(Path("../../output").glob("**/*.part*"))
 
     async with aiohttp.ClientSession() as session:
         tasks = [index_file(session, path) for path in parts]
