@@ -9,15 +9,16 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"sync"
 )
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-var Generate = &ucli.Command{
-	Name:  "generate",
-	Usage: "Generate metadata from .partX in given directory.",
+var Extract = &ucli.Command{
+	Name:  "extract",
+	Usage: "Extract metadata from .partX in given directory.",
 	Flags: []ucli.Flag{
 		&ucli.BoolFlag{
 			Name:    "verbose",
@@ -45,13 +46,13 @@ var Generate = &ucli.Command{
 			Value:   false,
 		},
 	},
-	Action: generate,
+	Action: extract,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-func generate(ctx context.Context, command *ucli.Command) error {
+func extract(ctx context.Context, command *ucli.Command) error {
 	logger.SetLoggerLevel(command.Bool("verbose"))
 	logger.Logger.Info().Msgf("Log level verbose: %t", command.Bool("verbose"))
 
@@ -108,7 +109,7 @@ func generate(ctx context.Context, command *ucli.Command) error {
 		//
 		metadataFilePath := filepath.Join(inputDirectory, "_metadata.csv")
 
-		metadataFile, err := utils.OpenOrCreateDatabase(metadataFilePath)
+		metadataFileWriter, err := utils.ParallelCsvWriter(metadataFilePath)
 		if err != nil {
 			continue
 		}
@@ -170,11 +171,12 @@ func generate(ctx context.Context, command *ucli.Command) error {
 				// Saving metadata
 				//
 				for metadata := range metadataChan {
-					if err := process.SaveMetadata(metadataFile, metadata); err != nil {
-						logger.Logger.Error().Msgf("Error saving metadata: %v", err)
-
-						return
-					}
+					metadataFileWriter.Write([]string{
+						metadata.File,
+						strings.Join(metadata.Emails, "|"),
+						strings.Join(metadata.IPs, "|"),
+						strings.Join(metadata.Domains, "|"),
+					})
 				}
 				// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 			}(path)
@@ -188,7 +190,7 @@ func generate(ctx context.Context, command *ucli.Command) error {
 		go func() {
 			wg.Wait()
 
-			err = metadataFile.Close()
+			err = metadataFileWriter.Close()
 			if err != nil {
 				logger.Logger.Error().Msgf("Error closing metadata db: %v", err)
 

@@ -14,7 +14,7 @@ func main() {
 	cmd := &ucli.Command{
 		Commands: []*ucli.Command{
 			cli.Chunkify,
-			cli.Generate,
+			cli.Extract,
 			cli.Populate,
 		},
 	}
