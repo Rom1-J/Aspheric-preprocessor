@@ -1,244 +1,85 @@
 package process
 
 import (
-	"bytes"
 	"context"
-	"encoding/csv"
-	"encoding/json"
-	"fmt"
-	"github.com/Rom1-J/preprocessor/logger"
-	"github.com/Rom1-J/preprocessor/structs"
-	"github.com/elastic/go-elasticsearch/v8"
-	"github.com/elastic/go-elasticsearch/v8/esapi"
-	"github.com/elastic/go-elasticsearch/v8/esutil"
-	"io"
+	"net/http"
 	"os"
 	"path/filepath"
-	"strconv"
-	"strings"
-	"time"
+	"sync"
+
+	"github.com/Rom1-J/preprocessor/logger"
+	ucli "github.com/urfave/cli/v3"
 )
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// IngestAll ingest all file in specified directory
+func IngestAll(_ context.Context, command *ucli.Command) {
+	logger.SetLoggerLevel(command.Bool("verbose"))
+	logger.Logger.Info().Msgf("Log level verbose: %t", command.Bool("verbose"))
 
-func Populate(client *elasticsearch.Client, bucketUUID string, filesPath []string) (esutil.BulkIndexerStats, error) {
-	logger.Logger.Debug().Msgf("Populate starting on: %s", bucketUUID)
+	baseURL := command.String("url")
+	maxThreads := int(command.Int("threads"))
 
-	var (
-		documents []*structs.DocumentStruct
-
-		res     *esapi.Response
-		biStats esutil.BulkIndexerStats
-		err     error
-	)
-
-	// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-	//
-	// Initializing index metadata
-	//
-	indexName := fmt.Sprintf("bucket-%s", bucketUUID)
-	// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-
-	// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-	//
-	// Create BulkIndexer
-	//
-	bi, err := esutil.NewBulkIndexer(esutil.BulkIndexerConfig{
-		Index:         indexName,        // The default index name
-		Client:        client,           // The Elasticsearch client
-		NumWorkers:    4,                // The number of worker goroutines
-		FlushBytes:    int(5e+6),        // The flush threshold in bytes
-		FlushInterval: 30 * time.Second, // The periodic flush interval
-	})
+	paths, err := filepath.Glob(command.String("input") + "/*/_metadata.csv")
 	if err != nil {
-		var msg = fmt.Sprintf("Error creating the bulk indexer of %s: %v", indexName, err)
-		logger.Logger.Fatal().Msgf(msg)
-
-		return biStats, fmt.Errorf(msg)
+		logger.Logger.Error().Msgf("Cannot list file in output/*/: %s", err)
+		return
 	}
-	// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
-	// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-	//
-	// Generate document collection
-	//
-	for _, filePath := range filesPath {
-		fileName := filepath.Base(filePath)
-		partStr := strings.TrimPrefix(strings.TrimSuffix(fileName, filepath.Ext(fileName)), "part")
-		part, err := strconv.Atoi(partStr)
-		if err != nil {
-			var msg = fmt.Sprintf("Error retrieving part number of %s: %v", filePath, err)
-			logger.Logger.Fatal().Msgf(msg)
+	var wg sync.WaitGroup
+	semaphore := make(chan struct{}, maxThreads)
 
-			return biStats, fmt.Errorf(msg)
-		}
+	for _, path := range paths {
+		logger.Logger.Debug().Msgf("Locking slot for: %s", path)
+		semaphore <- struct{}{}
+		wg.Add(1)
 
-		file, err := os.Open(filePath)
-		if err != nil {
-			var msg = fmt.Sprintf("Error opening file %s: %v", filePath, err)
-			logger.Logger.Error().Msgf(msg)
+		go func() {
+			defer func() {
+				logger.Logger.Debug().Msgf("Releasing slot for: %s", path)
+				<-semaphore
+				wg.Done()
+			}()
 
-			return biStats, fmt.Errorf(msg)
-		}
-		defer func(file *os.File) {
-			err := file.Close()
+			logger.Logger.Info().Msgf("Uploading file %s", path)
+
+			err := ingestCSV(baseURL, path, command.String("collection"))
 			if err != nil {
-				var msg = fmt.Sprintf("Error closing file %s: %v", filePath, err)
-				logger.Logger.Error().Msgf(msg)
-
-				return
+				logger.Logger.Error().Msgf("Cannot ingest file: %s", err)
 			}
-		}(file)
-
-		reader := csv.NewReader(file)
-
-		for {
-			record, err := reader.Read()
-			if err == io.EOF {
-				break
-			}
-
-			if err != nil {
-				var msg = fmt.Sprintf("Error reading CSV record for file %s: %v", filePath, err)
-				logger.Logger.Error().Msgf(msg)
-
-				return biStats, fmt.Errorf(msg)
-			}
-
-			if len(record) < 2 {
-				var msg = fmt.Sprintf("Invalid CSV record for file %s: %v", filePath, err)
-				logger.Logger.Error().Msgf(msg)
-
-				return biStats, fmt.Errorf(msg)
-			}
-
-			fragment := record[0]
-			offset, err := strconv.Atoi(record[1])
-			if err != nil {
-				var msg = fmt.Sprintf("Error converting offset to integer for file %s: %v", filePath, err)
-				logger.Logger.Error().Msgf(msg)
-
-				return biStats, fmt.Errorf(msg)
-			}
-
-			fragmentParts := strings.Split(fragment, ".")
-			tld := fragmentParts[len(fragmentParts)-1]
-
-			documents = append(
-				documents,
-				&structs.DocumentStruct{
-					Part:     part,
-					Offset:   offset,
-					Fragment: fragment,
-					TLD:      tld,
-				},
-			)
-		}
-	}
-	// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-
-	// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-	//
-	// Re-creating index
-	//
-	if res, err = client.Indices.Delete(
-		[]string{indexName},
-		client.Indices.Delete.WithIgnoreUnavailable(true),
-	); err != nil {
-		var msg = fmt.Sprintf("Error deleting index %s: %v", indexName, err)
-		logger.Logger.Fatal().Msgf(msg)
-
-		return biStats, fmt.Errorf(msg)
-	}
-	if res.IsError() {
-		var msg = fmt.Sprintf("Error deleting index %s: %s", indexName, res.String())
-		logger.Logger.Fatal().Msgf(msg)
-
-		return biStats, fmt.Errorf(msg)
-	}
-	if err := res.Body.Close(); err != nil {
-		var msg = fmt.Sprintf("Error closing delete index %s: %v", indexName, err)
-		logger.Logger.Error().Msgf(msg)
-
-		return biStats, fmt.Errorf(msg)
+		}()
 	}
 
-	// Create index
-	//
-	res, err = client.Indices.Create(indexName)
+	wg.Wait()
+}
+
+// ingestCSV upload a metadata csv file on Apache Solr
+func ingestCSV(solrURL string, path string, collection string) error {
+	url := solrURL + "/" + collection + "/update" + "?commit=true&fieldnames=id,emails,ips,domains&f.emails.split=true&f.emails.separator=|&f.ips.split=true&f.ips.separator=|&f.domains.split=true&f.domains.separator=|&optimize=true"
+	logger.Logger.Debug().Msgf("Ingesting file: %s, collection: %s, url: %s", path, collection, url)
+
+	f, err := os.Open(path)
 	if err != nil {
-		var msg = fmt.Sprintf("Error creating index %s: %v", indexName, err)
-		logger.Logger.Fatal().Msgf(msg)
-
-		return biStats, fmt.Errorf(msg)
+		return err
 	}
-	if res.IsError() {
-		var msg = fmt.Sprintf("Error creating index %s: %s", indexName, res.String())
-		logger.Logger.Fatal().Msgf(msg)
 
-		return biStats, fmt.Errorf(msg)
-	}
-	if err := res.Body.Close(); err != nil {
-		var msg = fmt.Sprintf("Error closing create index %s: %v", indexName, err)
-		logger.Logger.Error().Msgf(msg)
-
-		return biStats, fmt.Errorf(msg)
-	}
-	// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-
-	for _, document := range documents {
-		data, err := json.Marshal(document)
+	defer func(f *os.File) {
+		err := f.Close()
 		if err != nil {
-			var msg = fmt.Sprintf("Cannot encode document %d: %s", document.Fragment, err)
-			logger.Logger.Error().Msgf(msg)
-
-			continue
+			logger.Logger.Error().Msgf("Failed to close file: %v", err)
 		}
+	}(f)
 
-		// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-		//
-		// Add document to BulkIndexer
-		//
-		err = bi.Add(
-			context.Background(),
-			esutil.BulkIndexerItem{
-				Action: "index",
-				Body:   bytes.NewReader(data),
-				OnFailure: func(
-					ctx context.Context,
-					item esutil.BulkIndexerItem,
-					res esutil.BulkIndexerResponseItem,
-					err error,
-				) {
-					if err != nil {
-						logger.Logger.Error().Msgf("ERROR: %s", err)
-					} else {
-						logger.Logger.Error().Msgf("ERROR: %s: %s", res.Error.Type, res.Error.Reason)
-					}
-				},
-			},
-		)
-		if err != nil {
-			var msg = fmt.Sprintf("Unexpected error: %s", err)
-			logger.Logger.Error().Msgf(msg)
-
-			continue
-		}
-		// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+	req, err := http.NewRequest("POST", url, f)
+	if err != nil {
+		return err
 	}
 
-	// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-	//
-	// Close BulkIndexer
-	//
-	if err := bi.Close(context.Background()); err != nil {
-		var msg = fmt.Sprintf("Error closing the bulk indexer of %s: %v", indexName, err)
-		logger.Logger.Error().Msgf(msg)
-	}
-	// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-	biStats = bi.Stats()
+	req.Header.Set("Content-Type", "text/csv")
 
-	logger.Logger.Debug().Msgf("Populate finished on: %s", bucketUUID)
-	return biStats, nil
+	_, err = http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
