@@ -18,7 +18,7 @@ import (
 
 var Extract = &ucli.Command{
 	Name:  "extract",
-	Usage: "Extract metadata from .partX in given directory.",
+	Usage: "Extract metadata from .partX in given directory (must be run AFTER chunkify).",
 	Flags: []ucli.Flag{
 		&ucli.BoolFlag{
 			Name:    "verbose",
@@ -65,6 +65,7 @@ func extract(ctx context.Context, command *ucli.Command) error {
 	// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 	//
 	// Retrieving input descriptors
+	// todo: dedupe code logic
 	//
 	inputDirectories := command.StringSlice("directory")
 	searchRecursively := command.Bool("recursive")

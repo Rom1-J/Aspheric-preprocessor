@@ -94,6 +94,7 @@ func chunkify(ctx context.Context, command *ucli.Command) error {
 	// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 	//
 	// Retrieving input descriptors
+	// todo: dedupe code logic
 	//
 	inputFiles := command.StringSlice("input")
 	inputDirectories := command.StringSlice("directory")
