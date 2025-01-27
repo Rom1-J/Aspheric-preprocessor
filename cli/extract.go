@@ -45,6 +45,11 @@ var Extract = &ucli.Command{
 			Usage:   "Search recursively",
 			Value:   false,
 		},
+		&ucli.BoolFlag{
+			Name:  "overwrite",
+			Usage: "Overwrite existing _metadata.csv",
+			Value: false,
+		},
 	},
 	Action: extract,
 }
@@ -104,12 +109,26 @@ func extract(ctx context.Context, command *ucli.Command) error {
 	semaphore := make(chan struct{}, maxThreads)
 
 	for _, inputDirectory := range inputList {
+		metadataFilePath := filepath.Join(inputDirectory, "_metadata.csv")
+		// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+		//
+		// Skip if _metadata.csv exists
+		//
+		if _, err := os.Stat(metadataFilePath); err == nil {
+			if !command.Bool("overwrite") {
+				logger.Logger.Info().Msgf(
+					"Skipping directory '%s', use --overwrite to ignore existing _metadata.csv",
+					inputDirectory,
+				)
+				continue
+			}
+		}
+		// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
 		// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 		//
 		// Opening output descriptor
 		//
-		metadataFilePath := filepath.Join(inputDirectory, "_metadata.csv")
-
 		metadataFileWriter, err := utils.ParallelCsvWriter(metadataFilePath)
 		if err != nil {
 			continue

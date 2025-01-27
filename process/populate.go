@@ -15,12 +15,11 @@ import (
 func IngestCSV(metadataPath string, solrURL string, collection string) error {
 	url := solrURL +
 		"/" + collection +
-		"/update?commit=true" +
-		"&fieldnames=id,emails,ips,domains" +
+		"/update" +
+		"?fieldnames=id,emails,ips,domains" +
 		"&f.emails.split=true&f.emails.separator=|" +
 		"&f.ips.split=true&f.ips.separator=|" +
-		"&f.domains.split=true&f.domains.separator=|" +
-		"&optimize=true"
+		"&f.domains.split=true&f.domains.separator=|"
 	logger.Logger.Debug().Msgf("Ingesting file: %s, collection: %s, url: %s", metadataPath, collection, url)
 
 	// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
