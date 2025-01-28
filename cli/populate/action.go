@@ -14,8 +14,7 @@ import (
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 func Action(ctx context.Context, command *ucli.Command) error {
-	logger.SetLoggerLevel(command.Bool("verbose"))
-	logger.Logger.Info().Msgf("Log level verbose: %t", command.Bool("verbose"))
+	logger.SetLoggerLevel(command.Bool("silent"), command.String("log-level"))
 
 	var (
 		inputList     []string

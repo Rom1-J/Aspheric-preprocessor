@@ -3,22 +3,58 @@ package logger
 import (
 	"github.com/rs/zerolog"
 	"os"
+	"strings"
 	"time"
 )
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-var Logger = zerolog.New(
+var Logger zerolog.Logger
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+var fullLogger = zerolog.New(
 	zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: time.RFC3339},
 ).With().Timestamp().Caller().Logger()
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-func SetLoggerLevel(verbose bool) {
-	if verbose {
-		Logger = Logger.Level(zerolog.TraceLevel)
-	} else {
-		Logger = Logger.Level(zerolog.NoLevel)
+var partialLogger = zerolog.New(
+	zerolog.ConsoleWriter{
+		Out: os.Stderr,
+		FormatLevel: func(i interface{}) string {
+			return ""
+		},
+		FormatTimestamp: func(i interface{}) string {
+			return ""
+		},
+	},
+).With().Logger()
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+func SetLoggerLevel(silent bool, logLevel string) {
+	switch strings.ToLower(logLevel) {
+	case "fatal":
+		Logger = fullLogger.Level(zerolog.FatalLevel)
+	case "error":
+		Logger = fullLogger.Level(zerolog.ErrorLevel)
+	case "warn":
+		Logger = fullLogger.Level(zerolog.WarnLevel)
+	case "info":
+		Logger = fullLogger.Level(zerolog.InfoLevel)
+	case "debug":
+		Logger = fullLogger.Level(zerolog.DebugLevel)
+	case "trace":
+		Logger = fullLogger.Level(zerolog.TraceLevel)
+	default:
+		if !silent {
+			Logger = partialLogger.Level(zerolog.InfoLevel)
+		}
 	}
+
+	Logger.Debug().Msgf("Log level: %s", Logger.GetLevel().String())
 }

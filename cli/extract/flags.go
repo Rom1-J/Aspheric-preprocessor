@@ -9,12 +9,6 @@ import (
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 var Flags = []ucli.Flag{
-	&ucli.BoolFlag{
-		Name:    "verbose",
-		Aliases: []string{"v"},
-		Usage:   "Verbose mode",
-		Value:   false,
-	},
 	&ucli.IntFlag{
 		Name:     "threads",
 		Aliases:  []string{"t"},
