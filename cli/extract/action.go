@@ -1,4 +1,4 @@
-package cli
+package extract
 
 import (
 	"context"
@@ -8,7 +8,6 @@ import (
 	ucli "github.com/urfave/cli/v3"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"sync"
 )
@@ -16,48 +15,7 @@ import (
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-var Extract = &ucli.Command{
-	Name:  "extract",
-	Usage: "Extract metadata from .partX in given directory (must be run AFTER chunkify).",
-	Flags: []ucli.Flag{
-		&ucli.BoolFlag{
-			Name:    "verbose",
-			Aliases: []string{"v"},
-			Usage:   "Verbose mode",
-			Value:   false,
-		},
-		&ucli.IntFlag{
-			Name:     "threads",
-			Aliases:  []string{"t"},
-			Usage:    "Number of threads to use",
-			Value:    int64(runtime.NumCPU()),
-			Required: false,
-		},
-		&ucli.StringSliceFlag{
-			Name:     "directory",
-			Aliases:  []string{"d"},
-			Usage:    "Input directory",
-			Required: true,
-		},
-		&ucli.BoolFlag{
-			Name:    "recursive",
-			Aliases: []string{"r"},
-			Usage:   "Search recursively",
-			Value:   false,
-		},
-		&ucli.BoolFlag{
-			Name:  "overwrite",
-			Usage: "Overwrite existing _metadata.csv",
-			Value: false,
-		},
-	},
-	Action: extract,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-func extract(ctx context.Context, command *ucli.Command) error {
+func Action(ctx context.Context, command *ucli.Command) error {
 	logger.SetLoggerLevel(command.Bool("verbose"))
 	logger.Logger.Info().Msgf("Log level verbose: %t", command.Bool("verbose"))
 
@@ -179,7 +137,7 @@ func extract(ctx context.Context, command *ucli.Command) error {
 				//
 				// Extracting metadata from .partX
 				//
-				metadataChan, err := process.Extractor(path)
+				metadataChan, err := process.Extract(path)
 				if err != nil {
 					logger.Logger.Error().Msgf("Error starting extractor for file %s: %v", path, err)
 					return

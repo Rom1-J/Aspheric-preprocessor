@@ -1,87 +1,24 @@
-package cli
+package chunkify
 
 import (
 	"context"
+	"encoding/csv"
+	"github.com/Rom1-J/preprocessor/logger"
 	"github.com/Rom1-J/preprocessor/process"
 	"github.com/Rom1-J/preprocessor/structs"
 	"github.com/Rom1-J/preprocessor/utils"
 	"github.com/google/uuid"
-	"path/filepath"
-	"runtime"
-	"sync"
-
-	"github.com/Rom1-J/preprocessor/constants"
-	"github.com/Rom1-J/preprocessor/logger"
 	ucli "github.com/urfave/cli/v3"
 	"os"
+	"path/filepath"
+	"strconv"
+	"sync"
 )
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-var Chunkify = &ucli.Command{
-	Name:  "chunkify",
-	Usage: "Chunkify a file in small parts.",
-	Flags: []ucli.Flag{
-		&ucli.BoolFlag{
-			Name:    "verbose",
-			Aliases: []string{"v"},
-			Usage:   "Verbose mode",
-			Value:   false,
-		},
-		&ucli.StringSliceFlag{
-			Name:     "input",
-			Aliases:  []string{"i"},
-			Usage:    "Input file",
-			Required: false,
-		},
-		&ucli.StringSliceFlag{
-			Name:     "directory",
-			Aliases:  []string{"d"},
-			Usage:    "Input directory",
-			Required: false,
-		},
-		&ucli.StringFlag{
-			Name:     "output",
-			Aliases:  []string{"o"},
-			Usage:    "Output directory",
-			Value:    "./output",
-			Required: false,
-		},
-		&ucli.IntFlag{
-			Name:     "threads",
-			Aliases:  []string{"t"},
-			Usage:    "Number of threads to use",
-			Value:    int64(runtime.NumCPU()),
-			Required: false,
-		},
-		&ucli.StringFlag{
-			Name:        "name",
-			Usage:       "Name to be registered",
-			DefaultText: "",
-			Required:    false,
-		},
-		&ucli.StringFlag{
-			Name:        "description",
-			Usage:       "Description to be registered",
-			DefaultText: "",
-			Required:    false,
-		},
-		&ucli.IntFlag{
-			Name:     "size",
-			Aliases:  []string{"s"},
-			Usage:    "Size of each chunk in bytes",
-			Value:    constants.ChunkSize,
-			Required: false,
-		},
-	},
-	Action: chunkify,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-func chunkify(ctx context.Context, command *ucli.Command) error {
+func Action(ctx context.Context, command *ucli.Command) error {
 	logger.SetLoggerLevel(command.Bool("verbose"))
 	logger.Logger.Info().Msgf("Log level verbose: %t", command.Bool("verbose"))
 
@@ -155,7 +92,7 @@ func chunkify(ctx context.Context, command *ucli.Command) error {
 			}
 			// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
-			stats, err := utils.SplitFile(
+			stats, err := process.SplitFile(
 				filePath,
 				outputDirectoryPath,
 			)
@@ -190,9 +127,22 @@ func chunkify(ctx context.Context, command *ucli.Command) error {
 			if err != nil {
 				return
 			}
-			if err = process.SaveMetadataInfo(metadataInfoFile, metadataInfo); err != nil {
+			writer := csv.NewWriter(metadataInfoFile)
+			defer writer.Flush()
+
+			record := []string{
+				metadataInfo.Name,
+				metadataInfo.Description,
+				metadataInfo.Path,
+				strconv.Itoa(metadataInfo.Lines),
+				strconv.Itoa(metadataInfo.Parts),
+			}
+
+			if err := writer.Write(record); err != nil {
+				logger.Logger.Error().Msgf("Error writing to CSV: %v", err)
 				return
 			}
+
 			if err := metadataInfoFile.Close(); err != nil {
 				logger.Logger.Error().Msgf("Error closing metadataInfo db: %v", err)
 

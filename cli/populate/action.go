@@ -1,69 +1,19 @@
-package cli
+package populate
 
 import (
 	"context"
+	"github.com/Rom1-J/preprocessor/logger"
 	"github.com/Rom1-J/preprocessor/process"
+	ucli "github.com/urfave/cli/v3"
 	"os"
 	"path/filepath"
-	"runtime"
 	"sync"
-
-	"github.com/Rom1-J/preprocessor/logger"
-	ucli "github.com/urfave/cli/v3"
 )
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-var Populate = &ucli.Command{
-	Name:  "populate",
-	Usage: "Populate metadata to a Apache solr instance (must be run AFTER extract).",
-	Flags: []ucli.Flag{
-		&ucli.BoolFlag{
-			Name:    "verbose",
-			Aliases: []string{"v"},
-			Usage:   "Verbose mode",
-			Value:   false,
-		},
-		&ucli.StringSliceFlag{
-			Name:     "input",
-			Aliases:  []string{"i"},
-			Usage:    "Input file",
-			Required: false,
-		},
-		&ucli.StringSliceFlag{
-			Name:     "directory",
-			Aliases:  []string{"d"},
-			Usage:    "Input directory",
-			Required: false,
-		},
-		&ucli.StringSliceFlag{
-			Name:    "url",
-			Aliases: []string{"u"},
-			Usage:   "Apache Solr URLs",
-			Value:   []string{"http://localhost:8983/solr/"},
-		},
-		&ucli.StringFlag{
-			Name:    "collection",
-			Aliases: []string{"c"},
-			Usage:   "Collection name",
-			Value:   "BigBoi",
-		},
-		&ucli.IntFlag{
-			Name:     "threads",
-			Aliases:  []string{"t"},
-			Usage:    "Number of threads to use",
-			Value:    int64(runtime.NumCPU()),
-			Required: false,
-		},
-	},
-	Action: populate,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-func populate(ctx context.Context, command *ucli.Command) error {
+func Action(ctx context.Context, command *ucli.Command) error {
 	logger.SetLoggerLevel(command.Bool("verbose"))
 	logger.Logger.Info().Msgf("Log level verbose: %t", command.Bool("verbose"))
 
@@ -123,7 +73,7 @@ func populate(ctx context.Context, command *ucli.Command) error {
 
 		go func() {
 			currentThread++
-			
+
 			defer func() {
 				logger.Logger.Debug().Msgf("Releasing slot for: %s", path)
 				<-semaphore

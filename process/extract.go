@@ -12,8 +12,8 @@ import (
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-func Extractor(filePath string) (<-chan structs.MetadataStruct, error) {
-	logger.Logger.Debug().Msgf("Extractor starting on: %s", filePath)
+func Extract(filePath string) (<-chan structs.MetadataStruct, error) {
+	logger.Logger.Debug().Msgf("Extract starting on: %s", filePath)
 
 	metadataChan := make(chan structs.MetadataStruct)
 
@@ -84,7 +84,7 @@ func Extractor(filePath string) (<-chan structs.MetadataStruct, error) {
 		}
 		// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
-		logger.Logger.Debug().Msgf("Extractor finished on: %s", filePath)
+		logger.Logger.Debug().Msgf("Extract finished on: %s", filePath)
 	}()
 
 	return metadataChan, nil
