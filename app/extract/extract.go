@@ -3,7 +3,6 @@ package extract
 import (
 	"context"
 	"github.com/Rom1-J/preprocessor/logger"
-	"github.com/Rom1-J/preprocessor/process"
 	"github.com/Rom1-J/preprocessor/utils"
 	ucli "github.com/urfave/cli/v3"
 	"os"
@@ -136,7 +135,7 @@ func Action(ctx context.Context, command *ucli.Command) error {
 				//
 				// Extracting metadata from .partX
 				//
-				metadataChan, err := process.Extract(path)
+				metadataChan, err := Parse(path)
 				if err != nil {
 					logger.Logger.Error().Msgf("Error starting extractor for file %s: %v", path, err)
 					return

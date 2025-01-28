@@ -3,7 +3,6 @@ package populate
 import (
 	"context"
 	"github.com/Rom1-J/preprocessor/logger"
-	"github.com/Rom1-J/preprocessor/process"
 	ucli "github.com/urfave/cli/v3"
 	"os"
 	"path/filepath"
@@ -83,7 +82,7 @@ func Action(ctx context.Context, command *ucli.Command) error {
 			//
 			// Ingesting _metadata.csv
 			//
-			if err := process.IngestCSV(path, solrUrls[currentThread%len(solrUrls)], solrCollection); err != nil {
+			if err := IngestCSV(path, solrUrls[currentThread%len(solrUrls)], solrCollection); err != nil {
 				logger.Logger.Error().Msgf("Cannot ingest file '%s': %s", path, err)
 			}
 			// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<

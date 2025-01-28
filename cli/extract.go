@@ -1,13 +1,16 @@
-package extract
+package cli
 
-import ucli "github.com/urfave/cli/v3"
+import (
+	"github.com/Rom1-J/preprocessor/app/extract"
+	ucli "github.com/urfave/cli/v3"
+)
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-var Command = &ucli.Command{
+var Extract = &ucli.Command{
 	Name:   "extract",
 	Usage:  "Extract metadata from .partX in given directory (must be run AFTER chunkify).",
-	Flags:  Flags,
-	Action: Action,
+	Flags:  extract.Flags,
+	Action: extract.Action,
 }

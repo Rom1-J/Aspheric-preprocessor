@@ -1,15 +1,16 @@
-package chunkify
+package cli
 
 import (
+	"github.com/Rom1-J/preprocessor/app/populate"
 	ucli "github.com/urfave/cli/v3"
 )
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-var Command = &ucli.Command{
-	Name:   "chunkify",
-	Usage:  "Chunkify a file in small parts.",
-	Flags:  Flags,
-	Action: Action,
+var Populate = &ucli.Command{
+	Name:   "populate",
+	Usage:  "Populate metadata to a Apache solr instance (must be run AFTER extract).",
+	Flags:  populate.Flags,
+	Action: populate.Action,
 }

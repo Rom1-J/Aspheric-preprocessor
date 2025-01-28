@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/csv"
 	"github.com/Rom1-J/preprocessor/logger"
-	"github.com/Rom1-J/preprocessor/process"
 	"github.com/Rom1-J/preprocessor/structs"
 	"github.com/Rom1-J/preprocessor/utils"
 	"github.com/google/uuid"
@@ -91,7 +90,7 @@ func Action(ctx context.Context, command *ucli.Command) error {
 			}
 			// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
-			stats, err := process.SplitFile(
+			stats, err := SplitFile(
 				filePath,
 				outputDirectoryPath,
 			)

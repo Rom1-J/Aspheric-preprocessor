@@ -3,9 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/Rom1-J/preprocessor/cli/chunkify"
-	"github.com/Rom1-J/preprocessor/cli/extract"
-	"github.com/Rom1-J/preprocessor/cli/populate"
+	"github.com/Rom1-J/preprocessor/cli"
 	ucli "github.com/urfave/cli/v3"
 	"os"
 	"strings"
@@ -45,9 +43,9 @@ func main() {
 			},
 		},
 		Commands: []*ucli.Command{
-			chunkify.Command,
-			extract.Command,
-			populate.Command,
+			cli.Chunkify,
+			cli.Extract,
+			cli.Populate,
 		},
 	}
 	if err := cmd.Run(context.Background(), os.Args); err != nil {
