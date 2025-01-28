@@ -3,11 +3,11 @@ package extract
 import (
 	"context"
 	"github.com/Rom1-J/preprocessor/logger"
-	"github.com/Rom1-J/preprocessor/utils"
+	"github.com/Rom1-J/preprocessor/pkg/prog"
+	"github.com/jedib0t/go-pretty/v6/progress"
 	ucli "github.com/urfave/cli/v3"
 	"os"
 	"path/filepath"
-	"strings"
 	"sync"
 )
 
@@ -58,6 +58,21 @@ func Action(ctx context.Context, command *ucli.Command) error {
 
 	// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 	//
+	// Initialize progress bar
+	//
+	pw := prog.New(len(inputList))
+
+	tracker := progress.Tracker{
+		Message: "Directories processed",
+		Total:   int64(len(inputList)),
+	}
+	pw.AppendTracker(&tracker)
+
+	go pw.Render()
+	// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+	// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+	//
 	// Extracting from directories
 	//
 	var wg sync.WaitGroup
@@ -65,119 +80,17 @@ func Action(ctx context.Context, command *ucli.Command) error {
 	semaphore := make(chan struct{}, maxThreads)
 
 	for _, inputDirectory := range inputList {
-		metadataFilePath := filepath.Join(inputDirectory, "_metadata.csv")
-		// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-		//
-		// Skip if _metadata.csv exists
-		//
-		if _, err := os.Stat(metadataFilePath); err == nil {
-			if !command.Bool("overwrite") {
-				logger.Logger.Info().Msgf(
-					"Skipping directory '%s', use --overwrite to ignore existing _metadata.csv",
-					inputDirectory,
-				)
-				continue
-			}
-		}
-		// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-
-		// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-		//
-		// Opening output descriptor
-		//
-		metadataFileWriter, err := utils.ParallelCsvWriter(metadataFilePath)
+		err := ProcessDirectory(pw, &wg, semaphore, inputDirectory, command)
 		if err != nil {
-			continue
+			tracker.IncrementWithError(1)
 		}
-		// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-
-		// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-		//
-		// Retrieving .partX paths
-		//
-		var paths []string
-		err = filepath.Walk(inputDirectory, func(path string, info os.FileInfo, err error) error {
-			if err != nil {
-				logger.Logger.Error().Msgf("Error accessing path %s: %v", path, err)
-				return nil
-			}
-
-			if !info.IsDir() && filepath.Ext(path) != ".csv" {
-				paths = append(paths, path)
-			}
-
-			return nil
-		})
-
-		if err != nil {
-			logger.Logger.Error().Msgf("Error walking the directory: %v", err)
-			continue
-		}
-		// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-
-		// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-		//
-		// Processing paths
-		//
-		for _, path := range paths {
-			logger.Logger.Debug().Msgf("Locking slot for: %s", path)
-			semaphore <- struct{}{}
-			wg.Add(1)
-
-			go func(filePath string) {
-				defer func() {
-					logger.Logger.Debug().Msgf("Releasing slot for: %s", filePath)
-					<-semaphore
-					wg.Done()
-				}()
-
-				// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-				//
-				// Extracting metadata from .partX
-				//
-				metadataChan, err := Parse(path)
-				if err != nil {
-					logger.Logger.Error().Msgf("Error starting extractor for file %s: %v", path, err)
-					return
-				}
-				// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-
-				// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-				//
-				// Saving metadata
-				//
-				for metadata := range metadataChan {
-					metadataFileWriter.Write([]string{
-						metadata.File,
-						strings.Join(metadata.Emails, "|"),
-						strings.Join(metadata.IPs, "|"),
-						strings.Join(metadata.Domains, "|"),
-					})
-				}
-				// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-			}(path)
-		}
-		// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-
-		// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-		//
-		// Closing  output descriptor
-		//
-		go func() {
-			wg.Wait()
-
-			err = metadataFileWriter.Close()
-			if err != nil {
-				logger.Logger.Error().Msgf("Error closing metadata db: %v", err)
-
-				return
-			}
-		}()
-		// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+		tracker.Increment(1)
 	}
 	// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
 	wg.Wait()
+
+	tracker.MarkAsDone()
 
 	logger.Logger.Info().Msg("Done!")
 
