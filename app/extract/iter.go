@@ -3,6 +3,7 @@ package extract
 import (
 	"fmt"
 	"github.com/Rom1-J/preprocessor/logger"
+	"github.com/Rom1-J/preprocessor/pkg/prog"
 	"github.com/Rom1-J/preprocessor/utils"
 	"github.com/jedib0t/go-pretty/v6/progress"
 	"github.com/urfave/cli/v3"
@@ -18,7 +19,7 @@ import (
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-func ProcessDirectory(pw progress.Writer, wg *sync.WaitGroup, semaphore chan struct{}, inputDirectory string, command *cli.Command) error {
+func ProcessDirectory(globalProgress prog.ProgressOptsStruct, wg *sync.WaitGroup, semaphore chan struct{}, inputDirectory string, command *cli.Command) error {
 	metadataFilePath := filepath.Join(inputDirectory, "_metadata.csv")
 	// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 	//
@@ -30,7 +31,7 @@ func ProcessDirectory(pw progress.Writer, wg *sync.WaitGroup, semaphore chan str
 				"Skipping directory '%s', use --overwrite to ignore existing _metadata.csv",
 				inputDirectory,
 			)
-			pw.Log(message)
+			globalProgress.Pw.Log(message)
 			logger.Logger.Info().Msgf(message)
 
 			return nil
@@ -80,7 +81,8 @@ func ProcessDirectory(pw progress.Writer, wg *sync.WaitGroup, semaphore chan str
 		Message: "Processing directory " + filepath.Base(inputDirectory),
 		Total:   int64(len(paths)),
 	}
-	pw.AppendTracker(&tracker)
+	globalProgress.Pw.AppendTracker(&tracker)
+	globalProgress.GlobalTracker.UpdateTotal(globalProgress.GlobalTracker.Total + int64(len(paths)))
 	// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
 	// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
@@ -95,6 +97,7 @@ func ProcessDirectory(pw progress.Writer, wg *sync.WaitGroup, semaphore chan str
 		go func(filePath string) {
 			defer func() {
 				tracker.Increment(1)
+				globalProgress.GlobalTracker.Increment(1)
 
 				logger.Logger.Debug().Msgf("Releasing slot for: %s", filePath)
 				<-semaphore
@@ -142,10 +145,10 @@ func ProcessDirectory(pw progress.Writer, wg *sync.WaitGroup, semaphore chan str
 
 			return
 		}
+
+		tracker.MarkAsDone()
 	}()
 	// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-
-	tracker.MarkAsDone()
 
 	return nil
 }

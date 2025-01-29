@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"github.com/Rom1-J/preprocessor/constants"
 	"github.com/Rom1-J/preprocessor/logger"
-	"github.com/Rom1-J/preprocessor/structs"
 	"os"
 	"path/filepath"
 )
@@ -12,10 +11,10 @@ import (
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-func Parse(filePath string) (<-chan structs.MetadataStruct, error) {
+func Parse(filePath string) (<-chan MetadataStruct, error) {
 	logger.Logger.Debug().Msgf("Extract starting on: %s", filePath)
 
-	metadataChan := make(chan structs.MetadataStruct)
+	metadataChan := make(chan MetadataStruct)
 
 	go func() {
 		defer close(metadataChan)
@@ -76,7 +75,7 @@ func Parse(filePath string) (<-chan structs.MetadataStruct, error) {
 		//
 		// Returning metadata
 		//
-		metadataChan <- structs.MetadataStruct{
+		metadataChan <- MetadataStruct{
 			File:    filepath.Base(filePath),
 			Emails:  emails,
 			IPs:     ips,

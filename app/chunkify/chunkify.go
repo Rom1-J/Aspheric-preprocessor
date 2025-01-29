@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/csv"
 	"github.com/Rom1-J/preprocessor/logger"
-	"github.com/Rom1-J/preprocessor/structs"
 	"github.com/Rom1-J/preprocessor/utils"
 	"github.com/google/uuid"
 	ucli "github.com/urfave/cli/v3"
@@ -18,7 +17,7 @@ import (
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 func Action(ctx context.Context, command *ucli.Command) error {
-	logger.SetLoggerLevel(command.Bool("silent"), command.String("log-level"))
+	logger.SetLoggerLevel(command)
 
 	var (
 		inputList []string
@@ -104,7 +103,7 @@ func Action(ctx context.Context, command *ucli.Command) error {
 			//
 			// Generating metadata
 			//
-			var metadataInfo = structs.MetadataInfoStruct{
+			var metadataInfo = MetadataInfoStruct{
 				Name:        command.String("name"),
 				Description: command.String("description"),
 				Path:        absoluteOutputDirectoryPath,

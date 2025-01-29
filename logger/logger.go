@@ -2,6 +2,7 @@ package logger
 
 import (
 	"github.com/rs/zerolog"
+	ucli "github.com/urfave/cli/v3"
 	"os"
 	"strings"
 	"time"
@@ -11,6 +12,7 @@ import (
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 var Logger zerolog.Logger
+var ShowProgressbar bool
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -36,8 +38,12 @@ var partialLogger = zerolog.New(
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-func SetLoggerLevel(silent bool, logLevel string) {
-	switch strings.ToLower(logLevel) {
+func SetLoggerLevel(command *ucli.Command) {
+	silent := command.Bool("silent")
+	logLevel := strings.ToLower(command.String("log-level"))
+	progress := command.Bool("progress")
+
+	switch logLevel {
 	case "fatal":
 		Logger = fullLogger.Level(zerolog.FatalLevel)
 	case "error":
@@ -53,6 +59,15 @@ func SetLoggerLevel(silent bool, logLevel string) {
 	default:
 		if !silent {
 			Logger = partialLogger.Level(zerolog.InfoLevel)
+		}
+	}
+
+	if progress {
+		if logLevel != "none" {
+			ShowProgressbar = false
+			Logger.Warn().Msgf("--log-level and --progress are both set, --progress will be ignored")
+		} else {
+			ShowProgressbar = true
 		}
 	}
 

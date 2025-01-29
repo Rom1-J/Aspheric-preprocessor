@@ -21,6 +21,11 @@ func main() {
 				Usage:   "Silent mode",
 				Value:   false,
 			},
+			&ucli.BoolFlag{
+				Name:  "progress",
+				Usage: "Show progressbar",
+				Value: false,
+			},
 			&ucli.StringFlag{
 				Name:    "log-level",
 				Sources: ucli.EnvVars("LOG_LEVEL"),
