@@ -2,6 +2,7 @@ package populate
 
 import (
 	"context"
+	"github.com/Rom1-J/preprocessor/app/populate/logic"
 	"github.com/Rom1-J/preprocessor/logger"
 	ucli "github.com/urfave/cli/v3"
 	"os"
@@ -82,7 +83,7 @@ func Action(ctx context.Context, command *ucli.Command) error {
 			//
 			// Ingesting _metadata.csv
 			//
-			if err := IngestCSV(path, solrUrls[currentThread%len(solrUrls)], solrCollection); err != nil {
+			if err := logic.IngestCSV(path, solrUrls[currentThread%len(solrUrls)], solrCollection); err != nil {
 				logger.Logger.Error().Msgf("Cannot ingest file '%s': %s", path, err)
 			}
 			// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<

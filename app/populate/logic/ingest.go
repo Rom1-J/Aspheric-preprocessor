@@ -1,4 +1,4 @@
-package populate
+package logic
 
 import (
 	"fmt"

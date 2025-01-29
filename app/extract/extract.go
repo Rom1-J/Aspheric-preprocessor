@@ -2,6 +2,7 @@ package extract
 
 import (
 	"context"
+	"github.com/Rom1-J/preprocessor/app/extract/logic"
 	"github.com/Rom1-J/preprocessor/logger"
 	"github.com/Rom1-J/preprocessor/pkg/prog"
 	ucli "github.com/urfave/cli/v3"
@@ -72,7 +73,7 @@ func Action(ctx context.Context, command *ucli.Command) error {
 	semaphore := make(chan struct{}, maxThreads)
 
 	for _, inputDirectory := range inputList {
-		err := ProcessDirectory(globalProgress, &wg, semaphore, inputDirectory, command)
+		err := logic.ProcessDirectory(globalProgress, &wg, semaphore, inputDirectory, command)
 		if err != nil {
 			globalProgress.GlobalTracker.IncrementWithError(1)
 		}

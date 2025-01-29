@@ -1,11 +1,12 @@
-package extract
+package structs
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-type MetadataStruct struct {
-	File    string   `json:"file"`
-	Emails  []string `json:"emails"`
-	IPs     []string `json:"ips"`
-	Domains []string `json:"domains"`
+type MetadataInfoStruct struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Path        string `json:"path"`
+	Lines       int    `json:"lines"`
+	Parts       int    `json:"parts"`
 }

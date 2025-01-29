@@ -3,6 +3,8 @@ package chunkify
 import (
 	"context"
 	"encoding/csv"
+	"github.com/Rom1-J/preprocessor/app/chunkify/logic"
+	"github.com/Rom1-J/preprocessor/app/chunkify/structs"
 	"github.com/Rom1-J/preprocessor/logger"
 	"github.com/Rom1-J/preprocessor/utils"
 	"github.com/google/uuid"
@@ -89,7 +91,7 @@ func Action(ctx context.Context, command *ucli.Command) error {
 			}
 			// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
-			stats, err := SplitFile(
+			stats, err := logic.SplitFile(
 				filePath,
 				outputDirectoryPath,
 			)
@@ -103,7 +105,7 @@ func Action(ctx context.Context, command *ucli.Command) error {
 			//
 			// Generating metadata
 			//
-			var metadataInfo = MetadataInfoStruct{
+			var metadataInfo = structs.MetadataInfoStruct{
 				Name:        command.String("name"),
 				Description: command.String("description"),
 				Path:        absoluteOutputDirectoryPath,
