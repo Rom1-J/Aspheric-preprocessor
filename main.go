@@ -4,9 +4,11 @@ import (
 	"context"
 	"fmt"
 	"github.com/Rom1-J/preprocessor/cli"
+	"github.com/Rom1-J/preprocessor/pkg/prog"
 	ucli "github.com/urfave/cli/v3"
 	"os"
 	"strings"
+	"time"
 )
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -55,5 +57,11 @@ func main() {
 	}
 	if err := cmd.Run(context.Background(), os.Args); err != nil {
 		return
+	}
+
+	if prog.GlobalProgress.Pw != nil && prog.GlobalProgress.Pw.IsRenderInProgress() {
+		prog.GlobalProgress.GlobalTracker.MarkAsDone()
+		time.Sleep(time.Millisecond * 100)
+		prog.GlobalProgress.Pw.Stop()
 	}
 }

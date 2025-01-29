@@ -6,6 +6,8 @@ import (
 	"github.com/Rom1-J/preprocessor/app/chunkify/structs"
 	"github.com/Rom1-J/preprocessor/constants"
 	"github.com/Rom1-J/preprocessor/logger"
+	"github.com/Rom1-J/preprocessor/pkg/prog"
+	"github.com/jedib0t/go-pretty/v6/progress"
 	"os"
 	"path/filepath"
 )
@@ -13,11 +15,13 @@ import (
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-func SplitFile(inputFilePath string, outputDirectoryPath string) (structs.SplitFileStruct, error) {
+func SplitFile(globalProgress prog.ProgressOptsStruct, inputFilePath string, outputDirectoryPath string) (structs.SplitFileStruct, error) {
 	logger.Logger.Debug().Msgf("SplitFile starting on: %s", inputFilePath)
 
 	var (
+		fileSize    int64
 		currentSize int64
+		overallSize int64
 		fileIndex   int
 		outputFile  *os.File
 		writer      *bufio.Writer
@@ -38,6 +42,16 @@ func SplitFile(inputFilePath string, outputDirectoryPath string) (structs.SplitF
 
 		return structs.SplitFileStruct{}, err
 	}
+
+	fs, err := file.Stat()
+	if err != nil {
+		var msg = fmt.Sprintf("Failed to stat input file: %v", err)
+		logger.Logger.Error().Msgf(msg)
+
+		return structs.SplitFileStruct{}, err
+	}
+
+	fileSize = fs.Size()
 
 	defer func(file *os.File) {
 		if err := file.Close(); err != nil {
@@ -60,6 +74,19 @@ func SplitFile(inputFilePath string, outputDirectoryPath string) (structs.SplitF
 		return structs.SplitFileStruct{}, err
 	}
 	// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+	// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+	//
+	// Initialize tracker
+	//
+	tracker := progress.Tracker{
+		Message: "Processing file " + filepath.Base(inputFilePath),
+		Total:   fileSize,
+		Units:   progress.UnitsBytes,
+	}
+	globalProgress.Pw.AppendTracker(&tracker)
+	globalProgress.GlobalTracker.UpdateTotal(globalProgress.GlobalTracker.Total + 1)
+	// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
 	// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 	//
@@ -104,7 +131,10 @@ func SplitFile(inputFilePath string, outputDirectoryPath string) (structs.SplitF
 			}
 			writer = bufio.NewWriter(outputFile)
 
-			logger.Logger.Info().Msgf("Creating new chunk: %s", outputFileName)
+			logger.Logger.Debug().Msgf("Creating new chunk: %s", outputFileName)
+
+			overallSize += currentSize
+			tracker.SetValue(overallSize)
 
 			currentSize = 0
 			fileIndex++
@@ -139,7 +169,10 @@ func SplitFile(inputFilePath string, outputDirectoryPath string) (structs.SplitF
 	}
 	// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
-	logger.Logger.Info().Msgf("File split into %d chunks.", fileIndex)
+	logger.Logger.Info().Msgf("File '%s' split into %d chunks.", inputFilePath, fileIndex)
+
+	tracker.MarkAsDone()
+
 	return structs.SplitFileStruct{
 		Lines: lines,
 		Parts: fileIndex,

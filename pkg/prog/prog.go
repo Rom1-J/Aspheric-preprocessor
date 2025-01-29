@@ -12,6 +12,7 @@ import (
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 var Progress = progress.NewWriter()
+var GlobalProgress = ProgressOptsStruct{}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -53,20 +54,23 @@ func initProgress() {
 func New(message string, numTrackers int) ProgressOptsStruct {
 	initProgress()
 
-	Progress.SetNumTrackersExpected(numTrackers)
-
 	globalTracker := progress.Tracker{
 		Message: message,
 		Total:   int64(numTrackers),
+		Units:   progress.UnitsDefault,
 	}
+
+	Progress.SetNumTrackersExpected(numTrackers)
 	Progress.AppendTracker(&globalTracker)
 
 	if logger.ShowProgressbar {
 		go Progress.Render()
 	}
 
-	return ProgressOptsStruct{
+	GlobalProgress = ProgressOptsStruct{
 		Pw:            Progress,
 		GlobalTracker: &globalTracker,
 	}
+
+	return GlobalProgress
 }

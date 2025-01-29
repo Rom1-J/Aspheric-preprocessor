@@ -9,7 +9,6 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
-	"time"
 )
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -81,10 +80,6 @@ func Action(ctx context.Context, command *ucli.Command) error {
 	// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
 	wg.Wait()
-
-	globalProgress.GlobalTracker.MarkAsDone()
-	time.Sleep(time.Millisecond * 100)
-	globalProgress.Pw.Stop()
 
 	return nil
 }

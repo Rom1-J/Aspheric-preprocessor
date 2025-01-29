@@ -6,7 +6,8 @@ import (
 	"github.com/Rom1-J/preprocessor/app/chunkify/logic"
 	"github.com/Rom1-J/preprocessor/app/chunkify/structs"
 	"github.com/Rom1-J/preprocessor/logger"
-	"github.com/Rom1-J/preprocessor/utils"
+	"github.com/Rom1-J/preprocessor/pkg/prog"
+	"github.com/Rom1-J/preprocessor/pkg/utils"
 	"github.com/google/uuid"
 	ucli "github.com/urfave/cli/v3"
 	"os"
@@ -58,6 +59,13 @@ func Action(ctx context.Context, command *ucli.Command) error {
 
 	// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 	//
+	// Initialize progress bar
+	//
+	globalProgress := prog.New("Files processed", len(inputList))
+	// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+	// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+	//
 	// Chunkify files
 	//
 	var wg sync.WaitGroup
@@ -74,6 +82,8 @@ func Action(ctx context.Context, command *ucli.Command) error {
 				logger.Logger.Debug().Msgf("Releasing slot for: %s", filePath)
 				<-semaphore
 				wg.Done()
+
+				globalProgress.GlobalTracker.Increment(1)
 			}()
 
 			// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
@@ -92,6 +102,7 @@ func Action(ctx context.Context, command *ucli.Command) error {
 			// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
 			stats, err := logic.SplitFile(
+				globalProgress,
 				filePath,
 				outputDirectoryPath,
 			)

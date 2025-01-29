@@ -57,17 +57,16 @@ func SetLoggerLevel(command *ucli.Command) {
 	case "trace":
 		Logger = fullLogger.Level(zerolog.TraceLevel)
 	default:
-		if !silent {
+		if progress {
+			if logLevel != "none" {
+				ShowProgressbar = false
+				Logger.Warn().Msgf("--log-level and --progress are both set, --progress will be ignored")
+			} else {
+				ShowProgressbar = true
+			}
+		} else if !silent {
 			Logger = partialLogger.Level(zerolog.InfoLevel)
-		}
-	}
 
-	if progress {
-		if logLevel != "none" {
-			ShowProgressbar = false
-			Logger.Warn().Msgf("--log-level and --progress are both set, --progress will be ignored")
-		} else {
-			ShowProgressbar = true
 		}
 	}
 

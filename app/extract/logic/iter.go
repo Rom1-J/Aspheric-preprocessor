@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"github.com/Rom1-J/preprocessor/logger"
 	"github.com/Rom1-J/preprocessor/pkg/prog"
-	"github.com/Rom1-J/preprocessor/utils"
+	"github.com/Rom1-J/preprocessor/pkg/utils"
 	"github.com/jedib0t/go-pretty/v6/progress"
 	"github.com/urfave/cli/v3"
 	"os"
@@ -34,7 +34,6 @@ func ProcessDirectory(
 				"Skipping directory '%s', use --overwrite to ignore existing _metadata.csv",
 				inputDirectory,
 			)
-			globalProgress.Pw.Log(message)
 			logger.Logger.Info().Msgf(message)
 
 			return nil
