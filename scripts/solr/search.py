@@ -1,15 +1,16 @@
-import json
-
+import queue
+import re
+import subprocess
 import requests
+import threading
 import typing
 import sys
 
 # =============================================================================
 # =============================================================================
 
-COLLECTION_URL = "http://localhost:8983/api/collections/leaks.logs"
-CHUNK_SIZE = 10
-
+COLLECTION_URL = "http://192.168.1.211:8983/api/collections/leaks.logs"
+CHUNK_SIZE = 10000
 
 # =============================================================================
 # =============================================================================
@@ -37,6 +38,7 @@ class SolrHitResponseType(typing.TypedDict):
 class SolrHitType(typing.TypedDict):
     responseHeader: SolrHitResponseHeaderType
     response: SolrHitResponseType
+    nextCursorMark: str
 
 
 # =============================================================================
@@ -49,46 +51,95 @@ class ReadHitType(typing.TypedDict):
 # =============================================================================
 # =============================================================================
 
+# @profile
+def read_hits(
+    query: bytes, hits: SolrHitType
+) -> typing.Generator[ReadHitType, typing.Any, None]:
+    docs = hits["response"]["docs"]
 
-def read_hit(query: str, hit: SolrHitType)  -> typing.Generator[ReadHitType, typing.Any, None]:
-    docs = hit["response"]["docs"]
+    paths = [f"../../output/{x["id"]}" for x in docs]
 
-    for doc in docs:
-        if len(doc["content"]) == 0:
-            continue
+    result = subprocess.Popen(
+        ("rg", "-N", "-H", "--no-heading", "-j", "32", "-a", re.escape(query), *paths),
+        text=False,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL
+    )
 
-        for content in doc["content"][0].split("\n"):
-            if query in content:
-                yield ReadHitType(id=doc["id"], content=content)
+    for line in result.stdout:
+        filename, data = line.split(b":", 1)
 
+        yield ReadHitType(
+            id=filename.decode(),
+            content=data.decode(
+                "utf-8", errors="backslashreplace"
+            ).strip()
+        )
+
+    result.stdout.close()
+    result.wait()
 
 # =============================================================================
 
-
-def main(query: str) -> None:
-    start = 0
+# @profile
+def fetch_hits(query: str, q: queue.Queue) -> None:
+    cursor_mark = "*"
 
     while True:
         req = requests.get(
-            COLLECTION_URL + "/select",
+            COLLECTION_URL + "/query",
             params={
-                "q": f"content:*{query}*",
+                "q": f"domains:{query}",
+                "fl": "id",
                 "rows": CHUNK_SIZE,
-                "start": start,
-                "wt": "json",
-            }
+                "cursorMark": cursor_mark,
+                "sort": "id asc",
+            },
         )
+        req.raise_for_status()
 
-        if req.status_code == 200:
-            resp: SolrHitType = req.json()
-            start += CHUNK_SIZE
+        response = SolrHitType(**req.json())
 
-            if resp["response"]["docs"]:
-                for hit in read_hit(query, resp):
-                    print(json.dumps(hit))
-            else:
+        q.put(response)
+
+        docs = response.get("response", {}).get("docs", [])
+        next_cursor_mark = response.get("nextCursorMark", cursor_mark)
+
+        if not docs or response["response"]["numFound"] < CHUNK_SIZE:
+            break
+
+        if next_cursor_mark == cursor_mark:
+            break
+
+        cursor_mark = next_cursor_mark
+
+    q.put(None)
+
+# =============================================================================
+
+# @profile
+def main(query: str) -> None:
+    q = queue.Queue()
+    count = 0
+
+    fetch_thread = threading.Thread(target=fetch_hits, args=(query, q))
+    fetch_thread.start()
+
+    with open("/dev/stdout", "wb") as f:
+        while True:
+            response = q.get()
+            if response is None:
                 break
 
+            for doc in read_hits(query=query.encode(), hits=response):
+                f.write(b"%s\n" % str(doc).encode())
+                count += 1
+
+        fetch_thread.join()
+        f.write(b"Found %d hits" % count)
+
+
+# =============================================================================
 
 if __name__ == "__main__":
     try:

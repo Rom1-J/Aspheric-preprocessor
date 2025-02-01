@@ -2,6 +2,7 @@ package logic
 
 import (
 	"bufio"
+	"fmt"
 	"github.com/Rom1-J/preprocessor/app/extract/structs"
 	"github.com/Rom1-J/preprocessor/constants"
 	"github.com/Rom1-J/preprocessor/logger"
@@ -77,7 +78,7 @@ func Parse(filePath string) (<-chan structs.MetadataStruct, error) {
 		// Returning metadata
 		//
 		metadataChan <- structs.MetadataStruct{
-			File:    filepath.Base(filePath),
+			File:    fmt.Sprintf("%s/%s", filepath.Base(filepath.Dir(filePath)), filepath.Base(filePath)),
 			Emails:  emails,
 			IPs:     ips,
 			Domains: domains,

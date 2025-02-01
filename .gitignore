@@ -96,6 +96,7 @@ dist/*
 output/*
 venv/*
 
+*.lprof
 *.bak
 *.old
 .env
