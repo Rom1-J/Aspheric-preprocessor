@@ -2,15 +2,16 @@ package logic
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+	"sync"
+
 	"github.com/Rom1-J/preprocessor/logger"
 	"github.com/Rom1-J/preprocessor/pkg/prog"
 	"github.com/Rom1-J/preprocessor/pkg/utils"
 	"github.com/jedib0t/go-pretty/v6/progress"
 	"github.com/urfave/cli/v3"
-	"os"
-	"path/filepath"
-	"strings"
-	"sync"
 )
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -110,7 +111,7 @@ func ProcessDirectory(
 			//
 			// Extracting metadata from .partX
 			//
-			metadataChan, err := Parse(path)
+			metadataChan, err := Parse(path, command)
 			if err != nil {
 				logger.Logger.Error().Msgf("Error starting extractor for file %s: %v", path, err)
 				return

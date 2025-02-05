@@ -3,17 +3,20 @@ package logic
 import (
 	"bufio"
 	"fmt"
+	"os"
+	"path/filepath"
+	"slices"
+
 	"github.com/Rom1-J/preprocessor/app/extract/structs"
 	"github.com/Rom1-J/preprocessor/constants"
 	"github.com/Rom1-J/preprocessor/logger"
-	"os"
-	"path/filepath"
+	"github.com/urfave/cli/v3"
 )
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-func Parse(filePath string) (<-chan structs.MetadataStruct, error) {
+func Parse(filePath string, command *cli.Command) (<-chan structs.MetadataStruct, error) {
 	logger.Logger.Debug().Msgf("Extract starting on: %s", filePath)
 
 	metadataChan := make(chan structs.MetadataStruct)
@@ -29,6 +32,9 @@ func Parse(filePath string) (<-chan structs.MetadataStruct, error) {
 			emails  []string
 			ips     []string
 			domains []string
+			emails       []string
+			ips          []string
+			domains      []string
 		)
 		// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
@@ -69,6 +75,22 @@ func Parse(filePath string) (<-chan structs.MetadataStruct, error) {
 			emails = append(emails, constants.EmailPattern.FindAllString(line, -1)...)
 			ips = append(ips, constants.IpPattern.FindAllString(line, -1)...)
 			domains = append(domains, constants.DomainPattern.FindAllString(line, -1)...)
+			modules := command.StringSlice("module")
+			if slices.Contains(modules, "email") {
+				logger.Logger.Debug().Msgf("Use email module")
+				emails = append(emails, constants.EmailPattern.FindAllString(line, -1)...)
+			}
+
+			if slices.Contains(modules, "ip") {
+				logger.Logger.Debug().Msgf("Use ip module")
+				ips = append(ips, constants.IpPattern.FindAllString(line, -1)...)
+			}
+
+			if slices.Contains(modules, "domain") {
+				logger.Logger.Debug().Msgf("Use domain module")
+				domains = append(domains, constants.DomainPattern.FindAllString(line, -1)...)
+			}
+
 			// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 		}
 		// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
@@ -82,6 +104,10 @@ func Parse(filePath string) (<-chan structs.MetadataStruct, error) {
 			Emails:  emails,
 			IPs:     ips,
 			Domains: domains,
+			File:         fmt.Sprintf("%s/%s", filepath.Base(filepath.Dir(filePath)), filepath.Base(filePath)),
+			Emails:       emails,
+			IPs:          ips,
+			Domains:      domains,
 		}
 		// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 

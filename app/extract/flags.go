@@ -1,8 +1,9 @@
 package extract
 
 import (
-	ucli "github.com/urfave/cli/v3"
 	"runtime"
+
+	ucli "github.com/urfave/cli/v3"
 )
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -29,8 +30,14 @@ var Flags = []ucli.Flag{
 		Value:   false,
 	},
 	&ucli.BoolFlag{
-		Name:  "overwrite",
-		Usage: "Overwrite existing _metadata.csv",
-		Value: false,
+		Name:    "overwrite",
+		Aliases: []string{"f"},
+		Usage:   "Overwrite existing _metadata.csv",
+		Value:   false,
+	},
+	&ucli.StringSliceFlag{
+		Name:    "module",
+		Aliases: []string{"m"},
+		Usage:   "List of activated modules (comma separate) (all by default)",
 	},
 }

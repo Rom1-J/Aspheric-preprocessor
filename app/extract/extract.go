@@ -2,19 +2,20 @@ package extract
 
 import (
 	"context"
+	"os"
+	"path/filepath"
+	"sync"
+
 	"github.com/Rom1-J/preprocessor/app/extract/logic"
 	"github.com/Rom1-J/preprocessor/logger"
 	"github.com/Rom1-J/preprocessor/pkg/prog"
 	ucli "github.com/urfave/cli/v3"
-	"os"
-	"path/filepath"
-	"sync"
 )
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-func Action(ctx context.Context, command *ucli.Command) error {
+func Action(_ context.Context, command *ucli.Command) error {
 	logger.SetLoggerLevel(command)
 
 	var (

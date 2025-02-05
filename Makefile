@@ -17,6 +17,8 @@ OUTPUT_SOFT   := $(DIST_DIR)$(SOFT_NAME)-$(SOFT_VERSION)-$(GOOS)-$(ARCH)$(EXTENS
 
 LOGSTASH_PATH := ~/Tools/logstash-8.17.0/bin/logstash
 
+all: prepare build
+
 .PHONY: vet
 vet:
 	go vet main.go

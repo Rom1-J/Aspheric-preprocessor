@@ -3,12 +3,13 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/Rom1-J/preprocessor/cli"
-	"github.com/Rom1-J/preprocessor/pkg/prog"
-	ucli "github.com/urfave/cli/v3"
 	"os"
 	"strings"
 	"time"
+
+	"github.com/Rom1-J/preprocessor/cli"
+	"github.com/Rom1-J/preprocessor/pkg/prog"
+	ucli "github.com/urfave/cli/v3"
 )
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -32,6 +33,7 @@ func main() {
 				Name:    "log-level",
 				Sources: ucli.EnvVars("LOG_LEVEL"),
 				Usage:   "Set log level to print",
+				Aliases: []string{"l"},
 				Value:   "none",
 				Validator: func(s string) error {
 					switch strings.ToLower(s) {
