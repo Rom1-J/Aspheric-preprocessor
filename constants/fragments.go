@@ -22,6 +22,8 @@ var ipv6Pattern = regexp.MustCompile(`(((([0-9A-Fa-f]{1,4}:){1,6}:)|(([0-9A-Fa-f
 
 var IpPattern = regexp.MustCompile(strings.Join([]string{ipv4Pattern.String(), ipv6Pattern.String()}, "|"))
 
-var EmailPattern = regexp.MustCompile(`([0-9a-zA-Z-_\.+]+@(?:[a-zA-Z0-9-.]{1,253}\.)+[a-zA-Z]{2,})\b`)
+var EmailPattern = regexp.MustCompile(`([0-9a-zA-Z-_.+]+@(?:[a-zA-Z0-9-.]{1,253}\.)+[a-zA-Z]{2,})\b`)
+
+var PhonePattern = regexp.MustCompile(`^[+0-9][0-9().\-]{1,9}[0-9().\-]{4,15}\d{4,15}`)
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

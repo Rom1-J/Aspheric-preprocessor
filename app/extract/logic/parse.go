@@ -29,12 +29,10 @@ func Parse(filePath string, command *cli.Command) (<-chan structs.MetadataStruct
 		// Initializing fragments
 		//
 		var (
-			emails  []string
-			ips     []string
-			domains []string
 			emails       []string
 			ips          []string
 			domains      []string
+			phonenumbers []string
 		)
 		// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
@@ -72,9 +70,6 @@ func Parse(filePath string, command *cli.Command) (<-chan structs.MetadataStruct
 			//
 			// Extract fragments
 			//
-			emails = append(emails, constants.EmailPattern.FindAllString(line, -1)...)
-			ips = append(ips, constants.IpPattern.FindAllString(line, -1)...)
-			domains = append(domains, constants.DomainPattern.FindAllString(line, -1)...)
 			modules := command.StringSlice("module")
 			if slices.Contains(modules, "email") {
 				logger.Logger.Debug().Msgf("Use email module")
@@ -91,6 +86,11 @@ func Parse(filePath string, command *cli.Command) (<-chan structs.MetadataStruct
 				domains = append(domains, constants.DomainPattern.FindAllString(line, -1)...)
 			}
 
+			if slices.Contains(modules, "phonenumber") {
+				logger.Logger.Debug().Msgf("Use phonenumber module")
+				phonenumbers = append(domains, constants.PhonePattern.FindAllString(line, -1)...)
+			}
+
 			// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 		}
 		// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
@@ -100,14 +100,11 @@ func Parse(filePath string, command *cli.Command) (<-chan structs.MetadataStruct
 		// Returning metadata
 		//
 		metadataChan <- structs.MetadataStruct{
-			File:    fmt.Sprintf("%s/%s", filepath.Base(filepath.Dir(filePath)), filepath.Base(filePath)),
-			Emails:  emails,
-			IPs:     ips,
-			Domains: domains,
 			File:         fmt.Sprintf("%s/%s", filepath.Base(filepath.Dir(filePath)), filepath.Base(filePath)),
 			Emails:       emails,
 			IPs:          ips,
 			Domains:      domains,
+			PhoneNumbers: phonenumbers,
 		}
 		// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 

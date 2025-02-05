@@ -4,8 +4,9 @@ package structs
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 type MetadataStruct struct {
-	File    string   `json:"file"`
-	Emails  []string `json:"emails"`
-	IPs     []string `json:"ips"`
-	Domains []string `json:"domains"`
+	File         string   `json:"file"`
+	Emails       []string `json:"emails"`
+	IPs          []string `json:"ips"`
+	Domains      []string `json:"domains"`
+	PhoneNumbers []string `json:"phone_numbers"`
 }
