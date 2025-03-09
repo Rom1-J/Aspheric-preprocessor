@@ -36,3 +36,10 @@ build: prepare
 .PHONY: logstash
 logstash:
 	$(LOGSTASH_PATH) -f "`realpath confs/logstash.conf`" --pipeline.workers 32
+
+.PHONY: protoc
+protoc:
+	protoc \
+      --go_out=./ --go_opt=paths=source_relative --go_opt=Mproto/metadatainfo.proto=proto/metadatainfo.proto \
+      --python_out=./ \
+      ./proto/metadatainfo.proto

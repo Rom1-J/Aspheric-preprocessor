@@ -3,11 +3,8 @@ package logic
 import (
 	"bufio"
 	"fmt"
-	"github.com/Rom1-J/preprocessor/app/chunkify/structs"
 	"github.com/Rom1-J/preprocessor/constants"
 	"github.com/Rom1-J/preprocessor/logger"
-	"github.com/Rom1-J/preprocessor/pkg/prog"
-	"github.com/jedib0t/go-pretty/v6/progress"
 	"os"
 	"path/filepath"
 )
@@ -15,18 +12,14 @@ import (
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-func SplitFile(globalProgress prog.ProgressOptsStruct, inputFilePath string, outputDirectoryPath string) (structs.SplitFileStruct, error) {
-	logger.Logger.Debug().Msgf("SplitFile starting on: %s", inputFilePath)
-
+func Chunkify(filePath string) (string, error) {
+	logger.Logger.Debug().Msgf("Start file splitting on: %s", filePath)
 	var (
-		fileSize    int64
 		currentSize int64
 		overallSize int64
 		fileIndex   int
 		outputFile  *os.File
 		writer      *bufio.Writer
-
-		lines int
 
 		err error
 	)
@@ -35,23 +28,13 @@ func SplitFile(globalProgress prog.ProgressOptsStruct, inputFilePath string, out
 	//
 	// Initializing file reader
 	//
-	file, err := os.Open(inputFilePath)
+	file, err := os.Open(filePath)
 	if err != nil {
 		var msg = fmt.Sprintf("Failed to open input file: %v", err)
 		logger.Logger.Error().Msg(msg)
 
-		return structs.SplitFileStruct{}, err
+		return "", err
 	}
-
-	fs, err := file.Stat()
-	if err != nil {
-		var msg = fmt.Sprintf("Failed to stat input file: %v", err)
-		logger.Logger.Error().Msg(msg)
-
-		return structs.SplitFileStruct{}, err
-	}
-
-	fileSize = fs.Size()
 
 	defer func(file *os.File) {
 		if err := file.Close(); err != nil {
@@ -66,26 +49,17 @@ func SplitFile(globalProgress prog.ProgressOptsStruct, inputFilePath string, out
 	//
 	// Retrieve file basename
 	//
-	baseName := filepath.Base(inputFilePath)
-	if err = os.MkdirAll(outputDirectoryPath, 0755); err != nil {
-		var msg = fmt.Sprintf("Failed to open input file: %v", err)
+	baseName := filepath.Base(filePath)
+
+	parentDir := filepath.Dir(filePath)
+	outputDirectory := filepath.Join(parentDir, baseName+".chunked")
+
+	if err = os.MkdirAll(outputDirectory, 0755); err != nil {
+		var msg = fmt.Sprintf("Failed to create chunked directory: %v", err)
 		logger.Logger.Error().Msg(msg)
 
-		return structs.SplitFileStruct{}, err
+		return "", err
 	}
-	// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-
-	// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-	//
-	// Initialize tracker
-	//
-	tracker := progress.Tracker{
-		Message: "Processing file " + filepath.Base(inputFilePath),
-		Total:   fileSize,
-		Units:   progress.UnitsBytes,
-	}
-	globalProgress.Pw.AppendTracker(&tracker)
-	globalProgress.GlobalTracker.UpdateTotal(globalProgress.GlobalTracker.Total + 1)
 	// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
 	// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
@@ -94,7 +68,6 @@ func SplitFile(globalProgress prog.ProgressOptsStruct, inputFilePath string, out
 	//
 	for {
 		line, err := reader.ReadString('\n')
-		lines += 1
 		if err != nil {
 			if err.Error() == "EOF" {
 				break
@@ -102,7 +75,7 @@ func SplitFile(globalProgress prog.ProgressOptsStruct, inputFilePath string, out
 			var msg = fmt.Sprintf("Error reading file: %v", err)
 			logger.Logger.Error().Msg(msg)
 
-			return structs.SplitFileStruct{}, err
+			return "", err
 		}
 
 		// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
@@ -112,44 +85,51 @@ func SplitFile(globalProgress prog.ProgressOptsStruct, inputFilePath string, out
 		if outputFile == nil || currentSize+int64(len(line)) > constants.ChunkSize {
 			if writer != nil {
 				if err := writer.Flush(); err != nil {
-					return structs.SplitFileStruct{}, err
+					var msg = fmt.Sprintf("Failed to flush chunked file: %v", err)
+					logger.Logger.Error().Msg(msg)
+
+					return "", err
 				}
 			}
 			if outputFile != nil {
 				if err := outputFile.Close(); err != nil {
-					return structs.SplitFileStruct{}, err
+					var msg = fmt.Sprintf("Failed to close output file: %v", err)
+					logger.Logger.Error().Msg(msg)
+
+					return "", err
 				}
 			}
 
-			outputFileName := filepath.Join(outputDirectoryPath, fmt.Sprintf("%s.part%d", baseName, fileIndex))
+			outputFileName := filepath.Join(outputDirectory, fmt.Sprintf("%s.part%d", baseName, fileIndex))
 			outputFile, err = os.Create(outputFileName)
 			if err != nil {
 				var msg = fmt.Sprintf("Failed to create output file: %v", err)
 				logger.Logger.Error().Msg(msg)
 
-				return structs.SplitFileStruct{}, err
+				return "", err
 			}
 			writer = bufio.NewWriter(outputFile)
 
 			logger.Logger.Debug().Msgf("Creating new chunk: %s", outputFileName)
 
 			overallSize += currentSize
-			tracker.SetValue(overallSize)
 
 			currentSize = 0
 			fileIndex++
 		}
 		// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
-		n, writeErr := writer.WriteString(line)
-		if writeErr != nil {
-			var msg = fmt.Sprintf("Error writing to file: %v", writeErr)
-			logger.Logger.Error().Msg(msg)
+		if writer != nil {
+			n, writeErr := writer.WriteString(line)
+			if writeErr != nil {
+				var msg = fmt.Sprintf("Error writing to file: %v", writeErr)
+				logger.Logger.Error().Msg(msg)
 
-			return structs.SplitFileStruct{}, err
+				return "", err
+			}
+
+			currentSize += int64(n)
 		}
-
-		currentSize += int64(n)
 	}
 	// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
@@ -159,22 +139,23 @@ func SplitFile(globalProgress prog.ProgressOptsStruct, inputFilePath string, out
 	//
 	if writer != nil {
 		if err := writer.Flush(); err != nil {
-			return structs.SplitFileStruct{}, err
+			var msg = fmt.Sprintf("Error writing to file: %v", err)
+			logger.Logger.Error().Msg(msg)
+
+			return "", err
 		}
 	}
 	if outputFile != nil {
 		if err := outputFile.Close(); err != nil {
-			return structs.SplitFileStruct{}, err
+			var msg = fmt.Sprintf("Failed to close output file: %v", err)
+			logger.Logger.Error().Msg(msg)
+
+			return "", err
 		}
 	}
 	// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
-	logger.Logger.Info().Msgf("File '%s' split into %d chunks.", inputFilePath, fileIndex)
+	logger.Logger.Info().Msgf("File '%s' split into %d chunks.", filePath, fileIndex)
 
-	tracker.MarkAsDone()
-
-	return structs.SplitFileStruct{
-		Lines: lines,
-		Parts: fileIndex,
-	}, nil
+	return outputDirectory, nil
 }

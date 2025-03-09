@@ -50,6 +50,7 @@ func main() {
 			},
 		},
 		Commands: []*ucli.Command{
+			cli.Prepare,
 			cli.Chunkify,
 			cli.Extract,
 			cli.Populate,

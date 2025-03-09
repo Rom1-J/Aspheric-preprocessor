@@ -1,6 +1,10 @@
+import asyncio
+import json
 import queue
 import re
 import subprocess
+
+import redis.asyncio as redis
 import requests
 import threading
 import typing
@@ -10,7 +14,12 @@ import sys
 # =============================================================================
 
 COLLECTION_URL = "http://192.168.1.211:8983/api/collections/leaks.logs"
-CHUNK_SIZE = 10000
+CHUNK_SIZE = 10
+
+REDIS_HOST = "localhost"
+REDIS_PORT = 6379
+REDIS_DB = 0
+CACHE_EXPIRY = 3600
 
 # =============================================================================
 # =============================================================================
@@ -51,6 +60,13 @@ class ReadHitType(typing.TypedDict):
 # =============================================================================
 # =============================================================================
 
+redis_client = redis.Redis(
+    host=REDIS_HOST, port=REDIS_PORT, db=REDIS_DB, decode_responses=True
+)
+
+# =============================================================================
+# =============================================================================
+
 # @profile
 def read_hits(
     query: bytes, hits: SolrHitType
@@ -60,7 +76,17 @@ def read_hits(
     paths = [f"../../output/{x["id"]}" for x in docs]
 
     result = subprocess.Popen(
-        ("rg", "-N", "-H", "--no-heading", "-j", "32", "-a", re.escape(query), *paths),
+        (
+            "rg",
+            "-N",
+            "-H",
+            "--no-heading",
+            "-j",
+            "32",
+            "-a",
+            re.escape(query),
+            *paths
+        ),
         text=False,
         stdout=subprocess.PIPE,
         stderr=subprocess.DEVNULL
@@ -89,7 +115,8 @@ def fetch_hits(query: str, q: queue.Queue) -> None:
         req = requests.get(
             COLLECTION_URL + "/query",
             params={
-                "q": f"domains:{query}",
+                "q": "*:*",
+                "fq": f"domains:*{query}* OR emails:*{query}* OR ips:*{query}*",
                 "fl": "id",
                 "rows": CHUNK_SIZE,
                 "cursorMark": cursor_mark,
@@ -118,9 +145,19 @@ def fetch_hits(query: str, q: queue.Queue) -> None:
 # =============================================================================
 
 # @profile
-def main(query: str) -> None:
+async def main(query: str) -> None:
+    cache_key = f"solr_cache:{query}"
+    cached_results = await redis_client.get(cache_key)
+    results = set()
+
+    if cached_results:
+        cached_results = json.loads(cached_results)
+
+        for result in cached_results:
+            print(result)
+            results.add(result)
+
     q = queue.Queue()
-    count = 0
 
     fetch_thread = threading.Thread(target=fetch_hits, args=(query, q))
     fetch_thread.start()
@@ -132,17 +169,23 @@ def main(query: str) -> None:
                 break
 
             for doc in read_hits(query=query.encode(), hits=response):
-                f.write(b"%s\n" % str(doc).encode())
-                count += 1
+                result_str = json.dumps(doc)
+
+                if result_str not in results:
+                    f.write(b"%s\n" % result_str.encode())
+                    results.add(result_str)
 
         fetch_thread.join()
-        f.write(b"Found %d hits" % count)
+
+    await redis_client.setex(
+        cache_key, CACHE_EXPIRY, json.dumps(list(results))
+    )
 
 
 # =============================================================================
 
 if __name__ == "__main__":
     try:
-        main(sys.argv[1])
+        asyncio.run(main(sys.argv[1]))
     except KeyboardInterrupt:
         sys.exit(0)

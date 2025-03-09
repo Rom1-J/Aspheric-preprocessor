@@ -104,3 +104,5 @@ confs/logstash.conf
 confs/sincedb
 smol
 tests
+
+dump.rdb

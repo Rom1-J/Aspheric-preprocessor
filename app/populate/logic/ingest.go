@@ -16,7 +16,8 @@ func IngestCSV(metadataPath string, solrURL string, collection string) error {
 	url := solrURL +
 		"/" + collection +
 		"/update" +
-		"?fieldnames=id,emails,ips,domains" +
+		"?commitWithin=1000&overwrite=true" +
+		"&fieldnames=id,emails,ips,domains" +
 		"&f.emails.split=true&f.emails.separator=|" +
 		"&f.ips.split=true&f.ips.separator=|" +
 		"&f.domains.split=true&f.domains.separator=|"
