@@ -2,7 +2,9 @@ package logic
 
 import (
 	"fmt"
+	"github.com/Rom1-J/preprocessor/app/prepare/logic/generator"
 	"github.com/Rom1-J/preprocessor/logger"
+	"github.com/Rom1-J/preprocessor/pkg/archive"
 	"github.com/Rom1-J/preprocessor/pkg/prog"
 	metadatainfoproto "github.com/Rom1-J/preprocessor/proto"
 	"github.com/jedib0t/go-pretty/v6/progress"
@@ -19,7 +21,7 @@ func PrepareFile(globalProgress prog.ProgressOptsStruct, id string, date string,
 
 	// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 	//
-	// Getting file info
+	// Get file info
 	//
 	fileInfo, err := os.Stat(inputFilePath)
 	if err != nil {
@@ -72,7 +74,7 @@ func PrepareFile(globalProgress prog.ProgressOptsStruct, id string, date string,
 	var metadata *metadatainfoproto.MetadataInfo
 
 	if strings.HasSuffix(copiedFilePath, ".compressed") {
-		metadata, err = ProcessCompressedFile(id, date, dataDirectoryPath, copiedFilePath)
+		metadata, err = generator.ProcessCompressedFile(id, date, dataDirectoryPath, copiedFilePath)
 		if err != nil {
 			var msg = fmt.Sprintf("Failed to process compressed file: %v", err)
 			logger.Logger.Error().Msg(msg)
@@ -83,7 +85,7 @@ func PrepareFile(globalProgress prog.ProgressOptsStruct, id string, date string,
 			return nil, err
 		}
 	} else {
-		metadata, err = ProcessTextFile(id, date, dataDirectoryPath, copiedFilePath)
+		metadata, err = generator.ProcessUncompressedFile(id, date, dataDirectoryPath, copiedFilePath)
 		if err != nil {
 			var msg = fmt.Sprintf("Failed to process text file: %v", err)
 			logger.Logger.Error().Msg(msg)
@@ -100,9 +102,9 @@ func PrepareFile(globalProgress prog.ProgressOptsStruct, id string, date string,
 	//
 	// Compress output data directory
 	//
-	compressedDataDirectoryPath, err := CompressZstdArchive(dataDirectoryPath)
+	compressedDataDirectoryPath, err := archive.CompressZstdArchive(dataDirectoryPath)
 	if err != nil {
-		var msg = fmt.Sprintf("Failed to compress zstd archive from %s to %s: %v", dataDirectoryPath, compressedDataDirectoryPath, err)
+		var msg = fmt.Sprintf("Failed to compress archive archive from %s to %s: %v", dataDirectoryPath, compressedDataDirectoryPath, err)
 		logger.Logger.Warn().Msg(msg)
 	} else {
 		if err := os.RemoveAll(dataDirectoryPath); err != nil {
