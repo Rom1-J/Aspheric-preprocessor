@@ -52,7 +52,7 @@ func Action(ctx context.Context, command *ucli.Command) error {
 		}
 	}
 
-	logger.Logger.Debug().Msgf("Input files: %v", inputList)
+	logger.Logger.Trace().Msgf("Input files: %v", inputList)
 
 	logger.Logger.Info().Msgf("Chunkifing %d files", len(inputList))
 	// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
@@ -73,13 +73,13 @@ func Action(ctx context.Context, command *ucli.Command) error {
 	semaphore := make(chan struct{}, maxThreads)
 
 	for _, inputFile := range inputList {
-		logger.Logger.Debug().Msgf("Locking slot for: %s", inputFile)
+		logger.Logger.Trace().Msgf("Locking slot for: %s", inputFile)
 		semaphore <- struct{}{}
 		wg.Add(1)
 
 		go func(filePath string) {
 			defer func() {
-				logger.Logger.Debug().Msgf("Releasing slot for: %s", filePath)
+				logger.Logger.Trace().Msgf("Releasing slot for: %s", filePath)
 				<-semaphore
 				wg.Done()
 

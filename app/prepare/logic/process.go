@@ -15,173 +15,120 @@ import (
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-func ProcessSingleFile(date string, basePath string, filePath string) (*metadatainfoproto.MetadataInfo, error) {
+func generateForFile(id string, date string, basePath string, inputFilePath string) (*metadatainfoproto.MetadataInfo, error) {
+	logger.Logger.Trace().Msgf("Generating metadata for file %s from %s", inputFilePath, basePath)
 	// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 	//
 	// Getting file info
 	//
-	relPath, err := filepath.Rel(basePath, filePath)
+	relPath, err := filepath.Rel(basePath, inputFilePath)
 	if err != nil {
 		return nil, err
 	}
 
-	fileInfo, err := os.Stat(filePath)
+	fileInfo, err := os.Stat(inputFilePath)
 	if err != nil {
 		return nil, err
 	}
 	fileSize := fileInfo.Size()
-	// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
-	// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-	//
-	// Simhashing file
-	//
-	fileData, err := os.ReadFile(filePath)
+	fileData, err := os.ReadFile(inputFilePath)
 	if err != nil {
 		return nil, err
 	}
+	fileSimhash := fnv1a.HashBytes64(fileData)
+	// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
-	metadata := &metadatainfoproto.MetadataInfo{
-		Id:      uuid.New().String(),
+	var metadata = metadatainfoproto.MetadataInfo{
+		Id:      id,
 		Date:    date,
 		Path:    relPath,
 		Size:    uint64(fileSize),
-		Simhash: fnv1a.HashBytes64(fileData),
+		Simhash: fileSimhash,
 	}
-	// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+	if utils.CanBeChunks(inputFilePath) {
+		logger.Logger.Trace().Msgf("File %s too big, chunking it", inputFilePath)
+
+		// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+		//
+		// Chunkify file
+		//
+		chunkedDirPath, err := Chunkify(inputFilePath)
+		if err != nil {
+			var msg = fmt.Sprintf("Failed to chunkify file %s: %v", inputFilePath, err)
+			logger.Logger.Error().Msg(msg)
+
+			return nil, fmt.Errorf(msg)
+		}
+		// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+		// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+		//
+		// Update metadata Path as .chunked
+		//
+		relPath, err := filepath.Rel(basePath, chunkedDirPath)
+		if err != nil {
+			return nil, err
+		}
+		metadata.Path = relPath
+		// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+		// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+		//
+		// Delete old file
+		//
+		if err := os.Remove(inputFilePath); err != nil {
+			var msg = fmt.Sprintf("Failed to remove %s: %v", inputFilePath, err)
+			logger.Logger.Warn().Msg(msg)
+		}
+		// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+		// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+		//
+		// Getting metadata for new files
+		//
+		if err := filepath.WalkDir(chunkedDirPath, func(path string, d fs.DirEntry, err error) error {
+			if _, err := os.Stat(path); os.IsNotExist(err) || d.IsDir() {
+				return nil
+			}
+
+			partMetadata, err := generateForFile(uuid.New().String(), date, basePath, path)
+			if err != nil {
+				return err
+			}
+
+			metadata.Children = append(metadata.Children, partMetadata)
+
+			return nil
+		}); err != nil {
+			var msg = fmt.Sprintf("Failed to walk %s: %v", chunkedDirPath, err)
+			logger.Logger.Warn().Msg(msg)
+		}
+		// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+	}
+
+	return &metadata, nil
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+func ProcessTextFile(id string, date string, basePath string, inputFilePath string) (*metadatainfoproto.MetadataInfo, error) {
+	metadata, err := generateForFile(id, date, basePath, inputFilePath)
+	if err != nil {
+		var msg = fmt.Sprintf("Failed to get metadata for %s: %v", inputFilePath, err)
+		logger.Logger.Error().Msg(msg)
+
+		return nil, fmt.Errorf(msg)
+	}
 
 	return metadata, nil
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-func ProcessExtractedFiles(date string, basePath string) ([]*metadatainfoproto.MetadataInfo, error) {
-	var children []*metadatainfoproto.MetadataInfo
+func ProcessCompressedFile(id string, date string, basePath string, inputFilePath string) (*metadatainfoproto.MetadataInfo, error) {
+	return nil, nil
 
-	// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-	//
-	// Iterate files in basePath
-	//
-	err := filepath.WalkDir(basePath, func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-
-		// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-		//
-		// Abort when top root
-		//
-		relPath, _ := filepath.Rel(basePath, path)
-		if relPath == "." {
-			return nil
-		}
-		// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-
-		info, err := d.Info()
-		if err != nil {
-			logger.Logger.Error().Msgf("Failed to get info for %s: %v", path, err)
-			return nil
-		}
-
-		// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-		//
-		// Chunkify large files
-		//
-		if _, err := os.Stat(path); os.IsNotExist(err) {
-			return nil
-		}
-
-		if !d.IsDir() && utils.CanBeChunks(path) {
-			chunkedDirPath, err := Chunkify(path)
-			if err != nil {
-				var msg = fmt.Sprintf("Failed to chunkify file %s: %v", path, err)
-				logger.Logger.Error().Msg(msg)
-
-				return nil
-			}
-			// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-			//
-			// Delete old file
-			//
-			if err := os.Remove(path); err != nil {
-				var msg = fmt.Sprintf("Failed to remove %s: %v", path, err)
-				logger.Logger.Warn().Msg(msg)
-			}
-			// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-
-			return filepath.WalkDir(chunkedDirPath, func(chunkPath string, chunkD fs.DirEntry, chunkErr error) error {
-				if chunkErr != nil {
-					return chunkErr
-				}
-
-				chunkInfo, err := chunkD.Info()
-				if err != nil {
-					var msg = fmt.Sprintf("Failed to get info for chunked file %s: %v", chunkPath, err)
-					logger.Logger.Error().Msg(msg)
-
-					return nil
-				}
-
-				if !chunkD.IsDir() {
-					chunkData, err := os.ReadFile(chunkPath)
-					if err != nil {
-						var msg = fmt.Sprintf("Failed to read chunked file %s: %v", chunkPath, err)
-						logger.Logger.Error().Msg(msg)
-
-						return nil
-					}
-
-					rel, _ := filepath.Rel(basePath, chunkPath)
-					children = append(children, &metadatainfoproto.MetadataInfo{
-						Id:      uuid.New().String(),
-						Date:    date,
-						Path:    rel,
-						Size:    uint64(chunkInfo.Size()),
-						Simhash: fnv1a.HashBytes64(chunkData),
-					})
-				}
-
-				return nil
-			})
-		}
-		// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-
-		// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-		//
-		// Generate metadata info
-		//
-		metadata := &metadatainfoproto.MetadataInfo{
-			Id:   uuid.New().String(),
-			Date: date,
-			Path: relPath,
-			Size: uint64(info.Size()),
-		}
-
-		if info.IsDir() {
-			metadata.Children, err = ProcessExtractedFiles(date, path)
-			if err != nil {
-				var msg = fmt.Sprintf("Failed to process extracted files in %s: %v", path, err)
-				logger.Logger.Error().Msg(msg)
-
-				return nil
-			}
-		} else {
-			fileData, err := os.ReadFile(path)
-			if err != nil {
-				var msg = fmt.Sprintf("Failed to read file %s: %v", path, err)
-				logger.Logger.Error().Msg(msg)
-
-				return nil
-			}
-			metadata.Simhash = fnv1a.HashBytes64(fileData)
-		}
-
-		children = append(children, metadata)
-		// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-
-		return nil
-	})
-	// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-
-	return children, err
 }

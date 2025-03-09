@@ -50,9 +50,9 @@ func Action(ctx context.Context, command *ucli.Command) error {
 		}
 	}
 
-	logger.Logger.Debug().Msgf("Input files: %v", inputList)
+	logger.Logger.Trace().Msgf("Input files: %v", inputList)
 
-	logger.Logger.Info().Msgf("Chunkifing %d files", len(inputList))
+	logger.Logger.Info().Msgf("Preparing %d files", len(inputList))
 	// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
 	// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
@@ -83,13 +83,13 @@ func Action(ctx context.Context, command *ucli.Command) error {
 	semaphore := make(chan struct{}, maxThreads)
 
 	for _, inputFile := range inputList {
-		logger.Logger.Debug().Msgf("Locking slot for: %s", inputFile)
+		logger.Logger.Trace().Msgf("Locking slot for: %s", inputFile)
 		semaphore <- struct{}{}
 		wg.Add(1)
 
 		go func(filePath string) {
 			defer func() {
-				logger.Logger.Debug().Msgf("Releasing slot for: %s", filePath)
+				logger.Logger.Trace().Msgf("Releasing slot for: %s", filePath)
 				<-semaphore
 				wg.Done()
 
@@ -100,9 +100,9 @@ func Action(ctx context.Context, command *ucli.Command) error {
 			//
 			// Retrieving output descriptor
 			//
-			outputDirectoryPath := filepath.Join(command.String("output"), uuid.New().String())
+			id := uuid.New().String()
+			outputDirectoryPath := filepath.Join(command.String("output"), id)
 			metadataInfoFilePath := filepath.Join(outputDirectoryPath, "_info.pb")
-			// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
 			if err = os.MkdirAll(outputDirectoryPath, 0755); err != nil {
 				var msg = fmt.Sprintf("Failed to create output directory: %v", err)
@@ -111,8 +111,17 @@ func Action(ctx context.Context, command *ucli.Command) error {
 				return
 			}
 
+			if err = os.MkdirAll(filepath.Join(outputDirectoryPath, "data"), 0755); err != nil {
+				var msg = fmt.Sprintf("Failed to create output data directory: %v", err)
+				logger.Logger.Error().Msg(msg)
+
+				return
+			}
+			// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
 			metadataInfo, err := logic.PrepareFile(
 				globalProgress,
+				id,
 				command.String("date"),
 				filePath,
 				outputDirectoryPath,

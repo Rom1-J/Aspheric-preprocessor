@@ -13,7 +13,7 @@ import (
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 func Chunkify(filePath string) (string, error) {
-	logger.Logger.Debug().Msgf("Start file splitting on: %s", filePath)
+	logger.Logger.Trace().Msgf("Start file splitting on: %s", filePath)
 	var (
 		currentSize int64
 		overallSize int64
@@ -110,7 +110,7 @@ func Chunkify(filePath string) (string, error) {
 			}
 			writer = bufio.NewWriter(outputFile)
 
-			logger.Logger.Debug().Msgf("Creating new chunk: %s", outputFileName)
+			logger.Logger.Trace().Msgf("Creating new chunk: %s", outputFileName)
 
 			overallSize += currentSize
 

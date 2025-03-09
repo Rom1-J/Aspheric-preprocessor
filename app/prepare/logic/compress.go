@@ -8,7 +8,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"strings"
 )
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -19,8 +18,7 @@ func CompressZstdArchive(inputDirectoryPath string) (string, error) {
 	//
 	// Generate output file
 	//
-	baseName := filepath.Base(strings.TrimSuffix(inputDirectoryPath, ".extracted"))
-	outputFilePath := filepath.Join(filepath.Dir(inputDirectoryPath), baseName+".compressed")
+	outputFilePath := filepath.Join(filepath.Dir(inputDirectoryPath), filepath.Base(inputDirectoryPath)+".compressed")
 
 	outFile, err := os.Create(outputFilePath)
 	if err != nil {

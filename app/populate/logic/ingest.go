@@ -21,7 +21,7 @@ func IngestCSV(metadataPath string, solrURL string, collection string) error {
 		"&f.emails.split=true&f.emails.separator=|" +
 		"&f.ips.split=true&f.ips.separator=|" +
 		"&f.domains.split=true&f.domains.separator=|"
-	logger.Logger.Debug().Msgf("Ingesting file: %s, collection: %s, url: %s", metadataPath, collection, url)
+	logger.Logger.Trace().Msgf("Ingesting file: %s, collection: %s, url: %s", metadataPath, collection, url)
 
 	// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 	//

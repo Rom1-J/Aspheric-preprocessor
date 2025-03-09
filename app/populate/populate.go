@@ -54,7 +54,7 @@ func Action(ctx context.Context, command *ucli.Command) error {
 		}
 	}
 
-	logger.Logger.Debug().Msgf("Input files: %v", inputList)
+	logger.Logger.Trace().Msgf("Input files: %v", inputList)
 	// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
 	// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
@@ -66,7 +66,7 @@ func Action(ctx context.Context, command *ucli.Command) error {
 	semaphore := make(chan struct{}, maxThreads)
 
 	for _, path := range inputList {
-		logger.Logger.Debug().Msgf("Locking slot for: %s", path)
+		logger.Logger.Trace().Msgf("Locking slot for: %s", path)
 		semaphore <- struct{}{}
 		wg.Add(1)
 
@@ -74,7 +74,7 @@ func Action(ctx context.Context, command *ucli.Command) error {
 			currentThread++
 
 			defer func() {
-				logger.Logger.Debug().Msgf("Releasing slot for: %s", path)
+				logger.Logger.Trace().Msgf("Releasing slot for: %s", path)
 				<-semaphore
 				wg.Done()
 			}()

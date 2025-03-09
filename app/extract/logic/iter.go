@@ -92,7 +92,7 @@ func ProcessDirectory(
 	// Processing paths
 	//
 	for _, path := range paths {
-		logger.Logger.Debug().Msgf("Locking slot for: %s", path)
+		logger.Logger.Trace().Msgf("Locking slot for: %s", path)
 		semaphore <- struct{}{}
 		wg.Add(1)
 
@@ -101,7 +101,7 @@ func ProcessDirectory(
 				tracker.Increment(1)
 				globalProgress.GlobalTracker.Increment(1)
 
-				logger.Logger.Debug().Msgf("Releasing slot for: %s", filePath)
+				logger.Logger.Trace().Msgf("Releasing slot for: %s", filePath)
 				<-semaphore
 				wg.Done()
 			}()

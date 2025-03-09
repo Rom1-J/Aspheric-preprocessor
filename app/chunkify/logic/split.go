@@ -16,7 +16,7 @@ import (
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 func SplitFile(globalProgress prog.ProgressOptsStruct, inputFilePath string, outputDirectoryPath string) (structs.SplitFileStruct, error) {
-	logger.Logger.Debug().Msgf("SplitFile starting on: %s", inputFilePath)
+	logger.Logger.Trace().Msgf("SplitFile starting on: %s", inputFilePath)
 
 	var (
 		fileSize    int64
@@ -131,7 +131,7 @@ func SplitFile(globalProgress prog.ProgressOptsStruct, inputFilePath string, out
 			}
 			writer = bufio.NewWriter(outputFile)
 
-			logger.Logger.Debug().Msgf("Creating new chunk: %s", outputFileName)
+			logger.Logger.Trace().Msgf("Creating new chunk: %s", outputFileName)
 
 			overallSize += currentSize
 			tracker.SetValue(overallSize)

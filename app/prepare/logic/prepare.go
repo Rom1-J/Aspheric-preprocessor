@@ -14,8 +14,8 @@ import (
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-func PrepareFile(globalProgress prog.ProgressOptsStruct, date string, inputFilePath string, outputDirectoryPath string) (*metadatainfoproto.MetadataInfo, error) {
-	logger.Logger.Debug().Msgf("PrepareFile starting on: %s", inputFilePath)
+func PrepareFile(globalProgress prog.ProgressOptsStruct, id string, date string, inputFilePath string, outputDirectoryPath string) (*metadatainfoproto.MetadataInfo, error) {
+	logger.Logger.Trace().Msgf("PrepareFile starting on: %s", inputFilePath)
 
 	// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 	//
@@ -44,14 +44,37 @@ func PrepareFile(globalProgress prog.ProgressOptsStruct, date string, inputFileP
 
 	// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 	//
+	// Copy file to output directory
+	//
+	dataDirectoryPath := filepath.Join(outputDirectoryPath, "data")
+	copiedFilePath := filepath.Join(dataDirectoryPath, fileInfo.Name())
+
+	data, err := os.ReadFile(inputFilePath)
+	if err != nil {
+		var msg = fmt.Sprintf("Failed to read file %s: %v", inputFilePath, err)
+		logger.Logger.Error().Msg(msg)
+
+		return nil, err
+	}
+	err = os.WriteFile(copiedFilePath, data, 0644)
+	if err != nil {
+		var msg = fmt.Sprintf("Failed to write file %s: %v", copiedFilePath, err)
+		logger.Logger.Error().Msg(msg)
+
+		return nil, err
+	}
+	// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+	// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+	//
 	// Generate metadata
 	//
 	var metadata *metadatainfoproto.MetadataInfo
 
-	if strings.HasSuffix(inputFilePath, ".compressed") {
-		metadata, err = ExtractZstdArchive(date, inputFilePath, outputDirectoryPath)
+	if strings.HasSuffix(copiedFilePath, ".compressed") {
+		metadata, err = ProcessCompressedFile(id, date, dataDirectoryPath, copiedFilePath)
 		if err != nil {
-			var msg = fmt.Sprintf("Failed to extract zstd archive: %v", err)
+			var msg = fmt.Sprintf("Failed to process compressed file: %v", err)
 			logger.Logger.Error().Msg(msg)
 
 			globalProgress.Pw.Log(msg)
@@ -60,15 +83,31 @@ func PrepareFile(globalProgress prog.ProgressOptsStruct, date string, inputFileP
 			return nil, err
 		}
 	} else {
-		metadata, err = ProcessSingleFile(date, inputFilePath, outputDirectoryPath)
+		metadata, err = ProcessTextFile(id, date, dataDirectoryPath, copiedFilePath)
 		if err != nil {
-			var msg = fmt.Sprintf("Failed to process file: %v", err)
+			var msg = fmt.Sprintf("Failed to process text file: %v", err)
 			logger.Logger.Error().Msg(msg)
 
 			globalProgress.Pw.Log(msg)
 			tracker.MarkAsErrored()
 
 			return nil, err
+		}
+	}
+	// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+	// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+	//
+	// Compress output data directory
+	//
+	compressedDataDirectoryPath, err := CompressZstdArchive(dataDirectoryPath)
+	if err != nil {
+		var msg = fmt.Sprintf("Failed to compress zstd archive from %s to %s: %v", dataDirectoryPath, compressedDataDirectoryPath, err)
+		logger.Logger.Warn().Msg(msg)
+	} else {
+		if err := os.RemoveAll(dataDirectoryPath); err != nil {
+			var msg = fmt.Sprintf("Failed to remove file %s: %v", dataDirectoryPath, err)
+			logger.Logger.Warn().Msg(msg)
 		}
 	}
 	// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
