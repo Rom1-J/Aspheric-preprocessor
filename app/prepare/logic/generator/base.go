@@ -42,7 +42,7 @@ func GenerateForFile(id string, date string, basePath string, inputFilePath stri
 	var metadata = metadatainfoproto.MetadataInfo{
 		Id:      id,
 		Date:    date,
-		Path:    relPath,
+		Path:    []byte(relPath),
 		Size:    uint64(fileSize),
 		Simhash: fileSimhash,
 	}
@@ -71,7 +71,7 @@ func GenerateForFile(id string, date string, basePath string, inputFilePath stri
 		if err != nil {
 			return nil, err
 		}
-		metadata.Path = relPath
+		metadata.Path = []byte(relPath)
 		// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
 		// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
@@ -130,7 +130,7 @@ func GenerateForDirectory(id string, date string, basePath string, inputDirector
 	var metadata = metadatainfoproto.MetadataInfo{
 		Id:   id,
 		Date: date,
-		Path: relPath,
+		Path: []byte(relPath),
 	}
 
 	// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>

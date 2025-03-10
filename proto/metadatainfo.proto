@@ -5,7 +5,7 @@ package metadata;
 message MetadataInfo {
   string id = 1;
   string date = 2;
-  string path = 3;
+  bytes path = 3;
   uint64 size = 4;
   uint64 simhash = 5;
   repeated MetadataInfo children = 6;

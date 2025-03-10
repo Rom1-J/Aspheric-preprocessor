@@ -41,7 +41,7 @@ func ProcessCompressedFile(id string, date string, basePath string, inputFilePat
 	var metadata = metadatainfoproto.MetadataInfo{
 		Id:      id,
 		Date:    date,
-		Path:    strings.TrimSuffix(relPath, ".compressed"),
+		Path:    []byte(strings.TrimSuffix(relPath, ".compressed")),
 		Size:    uint64(fileSize),
 		Simhash: fileSimhash,
 	}
