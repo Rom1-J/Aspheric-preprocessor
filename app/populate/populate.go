@@ -54,7 +54,7 @@ func Action(ctx context.Context, command *ucli.Command) error {
 		}
 	}
 
-	logger.Logger.Trace().Msgf("Input files: %v", inputList)
+	logger.Logger.Debug().Msgf("Input files: %v", inputList)
 	// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
 	// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
@@ -67,6 +67,7 @@ func Action(ctx context.Context, command *ucli.Command) error {
 
 	for _, path := range inputList {
 		logger.Logger.Trace().Msgf("Locking slot for: %s", path)
+
 		semaphore <- struct{}{}
 		wg.Add(1)
 
@@ -75,6 +76,7 @@ func Action(ctx context.Context, command *ucli.Command) error {
 
 			defer func() {
 				logger.Logger.Trace().Msgf("Releasing slot for: %s", path)
+
 				<-semaphore
 				wg.Done()
 			}()

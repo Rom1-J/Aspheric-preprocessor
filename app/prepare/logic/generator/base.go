@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"github.com/Rom1-J/preprocessor/logger"
 	"github.com/Rom1-J/preprocessor/pkg/utils"
-	metadatainfoproto "github.com/Rom1-J/preprocessor/proto"
+	infoproto "github.com/Rom1-J/preprocessor/proto/info"
 	"github.com/google/uuid"
 	"github.com/segmentio/fasthash/fnv1a"
 	"io/fs"
@@ -15,17 +15,13 @@ import (
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-func GenerateForFile(id string, date string, basePath string, inputFilePath string) (*metadatainfoproto.MetadataInfo, error) {
-	logger.Logger.Trace().Msgf("Generating metadata for file %s from %s", inputFilePath, basePath)
+func GenerateForFile(id string, date string, inputFilePath string) (*infoproto.MetadataInfo, error) {
+	logger.Logger.Trace().Msgf("Generating metadata for file %s", inputFilePath)
+
 	// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 	//
 	// Get file info
 	//
-	relPath, err := filepath.Rel(basePath, inputFilePath)
-	if err != nil {
-		return nil, err
-	}
-
 	fileInfo, err := os.Stat(inputFilePath)
 	if err != nil {
 		return nil, err
@@ -39,15 +35,15 @@ func GenerateForFile(id string, date string, basePath string, inputFilePath stri
 	fileSimhash := fnv1a.HashBytes64(fileData)
 	// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
-	var metadata = metadatainfoproto.MetadataInfo{
+	var metadata = infoproto.MetadataInfo{
 		Id:      id,
 		Date:    date,
-		Path:    []byte(relPath),
+		Path:    []byte(filepath.Base(inputFilePath)),
 		Size:    uint64(fileSize),
 		Simhash: fileSimhash,
 	}
 
-	if utils.CanBeChunks(inputFilePath) {
+	if utils.IsChunkable(inputFilePath) {
 		logger.Logger.Trace().Msgf("File %s too big, chunking it", inputFilePath)
 
 		// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
@@ -67,11 +63,7 @@ func GenerateForFile(id string, date string, basePath string, inputFilePath stri
 		//
 		// Update metadata Path as .chunked
 		//
-		relPath, err := filepath.Rel(basePath, chunkedDirPath)
-		if err != nil {
-			return nil, err
-		}
-		metadata.Path = []byte(relPath)
+		metadata.Path = []byte(filepath.Base(chunkedDirPath))
 		// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
 		// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
@@ -93,7 +85,7 @@ func GenerateForFile(id string, date string, basePath string, inputFilePath stri
 				return nil
 			}
 
-			partMetadata, err := GenerateForFile(uuid.New().String(), date, basePath, path)
+			partMetadata, err := GenerateForFile(uuid.New().String(), date, path)
 			if err != nil {
 				return err
 			}
@@ -114,23 +106,13 @@ func GenerateForFile(id string, date string, basePath string, inputFilePath stri
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-func GenerateForDirectory(id string, date string, basePath string, inputDirectoryPath string) (*metadatainfoproto.MetadataInfo, error) {
-	logger.Logger.Trace().Msgf("Generating metadata for directory %s from %s", inputDirectoryPath, basePath)
+func GenerateForDirectory(id string, date string, inputDirectoryPath string) (*infoproto.MetadataInfo, error) {
+	logger.Logger.Trace().Msgf("Generating metadata for directory %s", inputDirectoryPath)
 
-	// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-	//
-	// Get dir info
-	//
-	relPath, err := filepath.Rel(basePath, inputDirectoryPath)
-	if err != nil {
-		return nil, err
-	}
-	// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-
-	var metadata = metadatainfoproto.MetadataInfo{
+	var metadata = infoproto.MetadataInfo{
 		Id:   id,
 		Date: date,
-		Path: []byte(relPath),
+		Path: []byte(filepath.Base(inputDirectoryPath)),
 	}
 
 	// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
@@ -153,12 +135,12 @@ func GenerateForDirectory(id string, date string, basePath string, inputDirector
 	for _, entry := range entries {
 		path := filepath.Join(inputDirectoryPath, entry.Name())
 
-		var entryMetadata *metadatainfoproto.MetadataInfo
+		var entryMetadata *infoproto.MetadataInfo
 
 		if entry.IsDir() {
-			entryMetadata, err = GenerateForDirectory(uuid.New().String(), date, inputDirectoryPath, path)
+			entryMetadata, err = GenerateForDirectory(uuid.New().String(), date, path)
 		} else {
-			entryMetadata, err = GenerateForFile(uuid.New().String(), date, inputDirectoryPath, path)
+			entryMetadata, err = GenerateForFile(uuid.New().String(), date, path)
 		}
 
 		if err != nil {

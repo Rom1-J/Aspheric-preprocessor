@@ -7,6 +7,7 @@ import (
 	"github.com/Rom1-J/preprocessor/logger"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 )
@@ -14,7 +15,25 @@ import (
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-func CanBeChunks(path string) bool {
+var partXRegex = regexp.MustCompile(`\.part\d+$`)
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+func IsReadable(path string) bool {
+	ext := strings.ToLower(filepath.Ext(path))
+
+	if slices.Contains(constants.TextFilesExtensions, ext) {
+		return true
+	}
+
+	return partXRegex.MatchString(path)
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+func IsChunkable(path string) bool {
 	stats, err := os.Stat(path)
 	if err != nil {
 		return false
@@ -24,9 +43,7 @@ func CanBeChunks(path string) bool {
 		return false
 	}
 
-	ext := filepath.Ext(path)
-
-	return stats.Size() > constants.ChunkSize && slices.Contains(constants.TextFilesExtensions, strings.ToLower(ext))
+	return stats.Size() > constants.ChunkSize && IsReadable(path) && !partXRegex.MatchString(path)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -34,6 +51,7 @@ func CanBeChunks(path string) bool {
 
 func Chunkify(filePath string) (string, error) {
 	logger.Logger.Trace().Msgf("Start file splitting on: %s", filePath)
+
 	var (
 		currentSize int64
 		overallSize int64
@@ -87,7 +105,7 @@ func Chunkify(filePath string) (string, error) {
 	// Split files
 	//
 	for {
-		line, err := reader.ReadString('\n')
+		line, err := reader.ReadBytes('\n')
 		if err != nil {
 			if err.Error() == "EOF" {
 				break
@@ -140,7 +158,7 @@ func Chunkify(filePath string) (string, error) {
 		// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
 		if writer != nil {
-			n, writeErr := writer.WriteString(line)
+			n, writeErr := writer.Write(line)
 			if writeErr != nil {
 				var msg = fmt.Sprintf("Error writing to file: %v", writeErr)
 				logger.Logger.Error().Msg(msg)

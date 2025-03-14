@@ -30,7 +30,7 @@ var Flags = []ucli.Flag{
 	},
 	&ucli.BoolFlag{
 		Name:  "overwrite",
-		Usage: "Overwrite existing _metadata.csv",
+		Usage: "Overwrite existing _metadata.pb",
 		Value: false,
 	},
 }

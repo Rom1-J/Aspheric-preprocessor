@@ -40,6 +40,15 @@ logstash:
 .PHONY: protoc
 protoc:
 	protoc \
-      --go_out=./ --go_opt=paths=source_relative --go_opt=Mproto/metadatainfo.proto=proto/metadatainfo.proto \
+      --go_out=./ \
+      --go_opt=paths=source_relative \
+      --go_opt=Mproto/info/info.proto=proto/info/info.proto \
       --python_out=./ \
-      ./proto/metadatainfo.proto
+      ./proto/info/info.proto
+
+	protoc \
+	  --go_out=./ \
+	  --go_opt=paths=source_relative \
+	  --go_opt=Mproto/metadata/metadata.proto=proto/metadata/metadata.proto \
+	  --python_out=./ \
+	  ./proto/metadata/metadata.proto

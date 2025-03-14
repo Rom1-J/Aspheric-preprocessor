@@ -4,7 +4,7 @@ package structs
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 type MetadataStruct struct {
-	File    string   `json:"file"`
+	Id      string   `json:"id"`
 	Emails  []string `json:"emails"`
 	IPs     []string `json:"ips"`
 	Domains []string `json:"domains"`

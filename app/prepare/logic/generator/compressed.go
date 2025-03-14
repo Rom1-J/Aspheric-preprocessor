@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"github.com/Rom1-J/preprocessor/logger"
 	"github.com/Rom1-J/preprocessor/pkg/archive"
-	metadatainfoproto "github.com/Rom1-J/preprocessor/proto"
+	infoproto "github.com/Rom1-J/preprocessor/proto/info"
 	"github.com/google/uuid"
 	"github.com/segmentio/fasthash/fnv1a"
 	"os"
@@ -15,16 +15,11 @@ import (
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-func ProcessCompressedFile(id string, date string, basePath string, inputFilePath string) (*metadatainfoproto.MetadataInfo, error) {
+func ProcessCompressedFile(id string, date string, inputFilePath string) (*infoproto.MetadataInfo, error) {
 	// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 	//
 	// Get file info
 	//
-	relPath, err := filepath.Rel(basePath, inputFilePath)
-	if err != nil {
-		return nil, err
-	}
-
 	fileInfo, err := os.Stat(inputFilePath)
 	if err != nil {
 		return nil, err
@@ -38,10 +33,10 @@ func ProcessCompressedFile(id string, date string, basePath string, inputFilePat
 	fileSimhash := fnv1a.HashBytes64(fileData)
 	// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
-	var metadata = metadatainfoproto.MetadataInfo{
+	var metadata = infoproto.MetadataInfo{
 		Id:      id,
 		Date:    date,
-		Path:    []byte(strings.TrimSuffix(relPath, ".compressed")),
+		Path:    []byte(strings.TrimSuffix(filepath.Base(inputFilePath), ".compressed")),
 		Size:    uint64(fileSize),
 		Simhash: fileSimhash,
 	}
@@ -90,12 +85,12 @@ func ProcessCompressedFile(id string, date string, basePath string, inputFilePat
 	for _, entry := range entries {
 		path := filepath.Join(extractedDirectoryPath, entry.Name())
 
-		var entryMetadata *metadatainfoproto.MetadataInfo
+		var entryMetadata *infoproto.MetadataInfo
 
 		if entry.IsDir() {
-			entryMetadata, err = GenerateForDirectory(uuid.New().String(), date, extractedDirectoryPath, path)
+			entryMetadata, err = GenerateForDirectory(uuid.New().String(), date, path)
 		} else {
-			entryMetadata, err = GenerateForFile(uuid.New().String(), date, extractedDirectoryPath, path)
+			entryMetadata, err = GenerateForFile(uuid.New().String(), date, path)
 		}
 
 		if err != nil {

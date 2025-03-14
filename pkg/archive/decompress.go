@@ -2,10 +2,8 @@ package archive
 
 import (
 	"archive/tar"
-	"bytes"
 	"fmt"
 	"github.com/Rom1-J/preprocessor/logger"
-	"github.com/klauspost/compress/zstd"
 	"io"
 	"os"
 	"path/filepath"
@@ -21,30 +19,24 @@ func DecompressZstdArchive(inputFilePath string) (string, error) {
 	//
 	// Open decompressed file reader
 	//
-	compressedData, err := os.ReadFile(inputFilePath)
+	tarReader, cleanup, err := OpenZstdReader(inputFilePath)
 	if err != nil {
-		var msg = fmt.Sprintf("Failed to read zstd archive: %v", err)
+		var msg = fmt.Sprintf("Failed to open zstd archive: %v", err)
 		logger.Logger.Error().Msg(msg)
 
-		return "", err
-	}
+		if cleanup != nil {
+			cleanup()
+		}
 
-	reader, err := zstd.NewReader(bytes.NewReader(compressedData))
-	if err != nil {
-		var msg = fmt.Sprintf("Failed to read zstd archive: %v", err)
-		logger.Logger.Error().Msg(msg)
-
-		return "", err
+		return "", fmt.Errorf(msg)
 	}
-	defer reader.Close()
+	defer cleanup()
 	// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
 	// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 	//
 	// Un-tar reader to extractedDirectoryPath
 	//
-	tarReader := tar.NewReader(reader)
-
 	for {
 		header, err := tarReader.Next()
 		if err == io.EOF {

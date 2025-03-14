@@ -50,7 +50,7 @@ func Action(ctx context.Context, command *ucli.Command) error {
 		}
 	}
 
-	logger.Logger.Trace().Msgf("Input files: %v", inputList)
+	logger.Logger.Debug().Msgf("Input files: %v", inputList)
 
 	logger.Logger.Info().Msgf("Preparing %d files", len(inputList))
 	// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
@@ -84,12 +84,14 @@ func Action(ctx context.Context, command *ucli.Command) error {
 
 	for _, inputFile := range inputList {
 		logger.Logger.Trace().Msgf("Locking slot for: %s", inputFile)
+
 		semaphore <- struct{}{}
 		wg.Add(1)
 
 		go func(filePath string) {
 			defer func() {
 				logger.Logger.Trace().Msgf("Releasing slot for: %s", filePath)
+
 				<-semaphore
 				wg.Done()
 
@@ -138,12 +140,12 @@ func Action(ctx context.Context, command *ucli.Command) error {
 			//
 			data, err := proto.Marshal(metadataInfo)
 			if err != nil {
-				logger.Logger.Error().Msgf("Error encoding metadata %s: %v", metadataInfoFilePath, err)
+				logger.Logger.Error().Msgf("Error encoding metadata info %s: %v", metadataInfoFilePath, err)
 			}
 
 			err = os.WriteFile(metadataInfoFilePath, data, 0644)
 			if err != nil {
-				logger.Logger.Error().Msgf("Error creating metadata %s: %v", metadataInfoFilePath, err)
+				logger.Logger.Error().Msgf("Error creating metadata info %s: %v", metadataInfoFilePath, err)
 			}
 			// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 		}(inputFile)
