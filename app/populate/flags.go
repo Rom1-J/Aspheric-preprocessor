@@ -21,6 +21,12 @@ var Flags = []ucli.Flag{
 		Usage:    "Input directory",
 		Required: false,
 	},
+	&ucli.BoolFlag{
+		Name:    "recursive",
+		Aliases: []string{"r"},
+		Usage:   "Search recursively",
+		Value:   false,
+	},
 	&ucli.StringSliceFlag{
 		Name:    "url",
 		Aliases: []string{"u"},

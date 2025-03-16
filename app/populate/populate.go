@@ -2,7 +2,6 @@ package populate
 
 import (
 	"context"
-	"github.com/Rom1-J/preprocessor/app/populate/logic"
 	"github.com/Rom1-J/preprocessor/logger"
 	ucli "github.com/urfave/cli/v3"
 	"os"
@@ -23,16 +22,17 @@ func Action(ctx context.Context, command *ucli.Command) error {
 		err error
 	)
 
+	//solrUrls := command.StringSlice("url")
+	//solrCollection := command.String("collection")
+
 	// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 	//
 	// Retrieving input descriptors
 	// todo: dedupe code logic
 	//
-	solrUrls := command.StringSlice("url")
-	solrCollection := command.String("collection")
-
 	inputFiles := command.StringSlice("input")
 	inputDirectories := command.StringSlice("directory")
+	searchRecursively := command.Bool("recursive")
 
 	inputList = append(inputList, inputFiles...)
 
@@ -43,9 +43,13 @@ func Action(ctx context.Context, command *ucli.Command) error {
 			}
 
 			if info.IsDir() {
-				metadataFilePath := filepath.Join(path, "_metadata.csv")
+				metadataFilePath := filepath.Join(path, "_metadata.pb")
 				if _, err := os.Stat(metadataFilePath); err == nil {
-					inputList = append(inputList, metadataFilePath)
+					inputList = append(inputList, path)
+				}
+
+				if !searchRecursively {
+					return filepath.SkipDir
 				}
 			}
 			return nil
@@ -83,11 +87,11 @@ func Action(ctx context.Context, command *ucli.Command) error {
 
 			// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 			//
-			// Ingesting _metadata.csv
+			// Ingesting _metadata.pb
 			//
-			if err := logic.IngestCSV(path, solrUrls[currentThread%len(solrUrls)], solrCollection); err != nil {
-				logger.Logger.Error().Msgf("Cannot ingest file '%s': %s", path, err)
-			}
+			//if err := logic.IngestCSV(path, solrUrls[currentThread%len(solrUrls)], solrCollection); err != nil {
+			//	logger.Logger.Error().Msgf("Cannot ingest file '%s': %s", path, err)
+			//}
 			// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 		}()
 	}

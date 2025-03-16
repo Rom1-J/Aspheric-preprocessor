@@ -85,6 +85,8 @@ func ProcessDirectory(
 	if len(paths) == 0 {
 		logger.Logger.Warn().Msgf("No paths found for %s", metadataInfoFilePath)
 	}
+
+	tracker.UpdateMessage(fmt.Sprintf("Processing directory %s (%d files)", filepath.Base(inputDirectory), len(paths)))
 	tracker.UpdateTotal(int64(len(paths)))
 	// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
@@ -102,7 +104,7 @@ func ProcessDirectory(
 		var dataFilePath string
 		parts := strings.Split(path, "/")
 
-		if !strings.HasSuffix(parts[0], ".chunked") {
+		if !strings.HasSuffix(parts[0], ".chunked") || len(metadataInfo.Children) > 0 {
 			dataFilePath = filepath.Join(
 				inputDirectory,
 				"data",
@@ -158,7 +160,6 @@ func ProcessDirectory(
 	wg.Wait()
 
 	tracker.MarkAsDone()
-	globalProgress.GlobalTracker.Increment(1)
 	// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
 	return metadataList, nil

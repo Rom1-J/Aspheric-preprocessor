@@ -6,6 +6,7 @@ import (
 	"github.com/Rom1-J/preprocessor/app/extract/logic"
 	"github.com/Rom1-J/preprocessor/logger"
 	"github.com/Rom1-J/preprocessor/pkg/prog"
+	metadataproto "github.com/Rom1-J/preprocessor/proto/metadata"
 	ucli "github.com/urfave/cli/v3"
 	"google.golang.org/protobuf/proto"
 	"os"
@@ -94,27 +95,39 @@ func Action(ctx context.Context, command *ucli.Command) error {
 			//
 			// Saving metadata
 			//
-			metadataFilePath := filepath.Join(inputDirectory, "_metadata.pb")
+			logger.Logger.Trace().Msgf("Locking slot for saving: %s", inputDirectory)
+			semaphore <- struct{}{}
+			wg.Add(1)
 
-			data, err := proto.Marshal(metadataList)
-			if err != nil {
-				var msg = fmt.Sprintf("Error encoding metadata %s: %v", metadataFilePath, err)
-				logger.Logger.Error().Msg(msg)
-				globalProgress.GlobalTracker.IncrementWithError(1)
+			go func(ipd string, ml *metadataproto.MetadataList) {
+				defer func() {
+					logger.Logger.Trace().Msgf("Releasing slot for saving: %s", ipd)
+					<-semaphore
+					wg.Done()
+				}()
 
-				continue
-			}
+				metadataFilePath := filepath.Join(ipd, "_metadata.pb")
 
-			err = os.WriteFile(metadataFilePath, data, 0644)
-			if err != nil {
-				var msg = fmt.Sprintf("Error creating metadata %s: %v", metadataFilePath, err)
-				logger.Logger.Error().Msg(msg)
-				globalProgress.GlobalTracker.IncrementWithError(1)
+				data, err := proto.Marshal(ml)
+				if err != nil {
+					var msg = fmt.Sprintf("Error encoding metadata %s: %v", metadataFilePath, err)
+					logger.Logger.Error().Msg(msg)
+					globalProgress.GlobalTracker.IncrementWithError(1)
 
-				continue
-			}
+					return
+				}
 
-			globalProgress.GlobalTracker.Increment(1)
+				err = os.WriteFile(metadataFilePath, data, 0644)
+				if err != nil {
+					var msg = fmt.Sprintf("Error creating metadata %s: %v", metadataFilePath, err)
+					logger.Logger.Error().Msg(msg)
+					globalProgress.GlobalTracker.IncrementWithError(1)
+
+					return
+				}
+
+				globalProgress.GlobalTracker.Increment(1)
+			}(inputDirectory, metadataList)
 			// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 		}
 	}

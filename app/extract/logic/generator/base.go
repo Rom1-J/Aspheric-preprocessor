@@ -17,7 +17,7 @@ func RetrieveReadableFilePaths(metadata *infoproto.MetadataInfo) map[string]*inf
 		path := string(node.Path)
 		fullPath := filepath.Join(currentPath, path)
 
-		if utils.IsReadable(fullPath) {
+		if utils.IsReadable(fullPath) && node.Simhash != 0 {
 			fileMap[fullPath] = node
 		}
 
