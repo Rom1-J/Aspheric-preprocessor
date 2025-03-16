@@ -2,7 +2,10 @@ package populate
 
 import (
 	"context"
+	"github.com/Rom1-J/preprocessor/app/populate/logic"
+	"github.com/Rom1-J/preprocessor/app/populate/structs"
 	"github.com/Rom1-J/preprocessor/logger"
+	"github.com/Rom1-J/preprocessor/pkg/prog"
 	ucli "github.com/urfave/cli/v3"
 	"os"
 	"path/filepath"
@@ -16,14 +19,10 @@ func Action(ctx context.Context, command *ucli.Command) error {
 	logger.SetLoggerLevel(command)
 
 	var (
-		inputList     []string
-		currentThread int
+		inputList []string
 
 		err error
 	)
-
-	//solrUrls := command.StringSlice("url")
-	//solrCollection := command.String("collection")
 
 	// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 	//
@@ -63,24 +62,29 @@ func Action(ctx context.Context, command *ucli.Command) error {
 
 	// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 	//
+	// Initialize progress bar
+	//
+	globalProgress := prog.New("Directories processed", len(inputList))
+	// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+	// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+	//
 	// Processing paths
 	//
 	var wg sync.WaitGroup
 	maxThreads := int(command.Int("threads"))
 	semaphore := make(chan struct{}, maxThreads)
 
-	for _, path := range inputList {
-		logger.Logger.Trace().Msgf("Locking slot for: %s", path)
-
+	for i, inputDirectory := range inputList {
+		logger.Logger.Trace().Msgf("Locking slot for saving: %s", inputDirectory)
 		semaphore <- struct{}{}
 		wg.Add(1)
 
-		go func() {
-			currentThread++
-
+		go func(ipd string) {
 			defer func() {
-				logger.Logger.Trace().Msgf("Releasing slot for: %s", path)
+				logger.Logger.Trace().Msgf("Releasing slot for saving: %s", ipd)
 
+				globalProgress.GlobalTracker.Increment(1)
 				<-semaphore
 				wg.Done()
 			}()
@@ -89,15 +93,24 @@ func Action(ctx context.Context, command *ucli.Command) error {
 			//
 			// Ingesting _metadata.pb
 			//
-			//if err := logic.IngestCSV(path, solrUrls[currentThread%len(solrUrls)], solrCollection); err != nil {
-			//	logger.Logger.Error().Msgf("Cannot ingest file '%s': %s", path, err)
-			//}
+			if err := logic.ProcessDirectory(
+				globalProgress,
+				ipd,
+				structs.SolrOptsStruct{
+					Address:    command.StringSlice("url")[i%len(command.StringSlice("url"))],
+					Collection: command.String("collection"),
+				},
+			); err != nil {
+				logger.Logger.Error().Msgf("Cannot ingest file '%s': %s", ipd, err)
+			}
 			// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-		}()
+		}(inputDirectory)
 	}
+	// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
 	wg.Wait()
-	// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+	logger.Logger.Info().Msg("Done!")
 
 	return nil
 }
