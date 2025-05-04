@@ -7,6 +7,7 @@ import (
 	infoproto "github.com/Rom1-J/preprocessor/proto/info"
 	"github.com/google/uuid"
 	"github.com/segmentio/fasthash/fnv1a"
+	ucli "github.com/urfave/cli/v3"
 	"os"
 	"path/filepath"
 	"strings"
@@ -15,7 +16,7 @@ import (
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-func ProcessCompressedFile(id string, date string, inputFilePath string) (*infoproto.MetadataInfo, error) {
+func ProcessCompressedFile(id string, command *ucli.Command, inputFilePath string) (*infoproto.MetadataInfo, error) {
 	// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 	//
 	// Get file info
@@ -35,7 +36,7 @@ func ProcessCompressedFile(id string, date string, inputFilePath string) (*infop
 
 	var metadata = infoproto.MetadataInfo{
 		Id:      id,
-		Date:    date,
+		Date:    command.String("date"),
 		Path:    []byte(strings.TrimSuffix(filepath.Base(inputFilePath), ".compressed")),
 		Size:    uint64(fileSize),
 		Simhash: fileSimhash,
@@ -88,9 +89,9 @@ func ProcessCompressedFile(id string, date string, inputFilePath string) (*infop
 		var entryMetadata *infoproto.MetadataInfo
 
 		if entry.IsDir() {
-			entryMetadata, err = GenerateForDirectory(uuid.New().String(), date, path)
+			entryMetadata, err = GenerateForDirectory(uuid.New().String(), command, path)
 		} else {
-			entryMetadata, err = GenerateForFile(uuid.New().String(), date, path)
+			entryMetadata, err = GenerateForFile(uuid.New().String(), command, path)
 		}
 
 		if err != nil {

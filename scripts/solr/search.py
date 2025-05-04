@@ -73,37 +73,40 @@ def read_hits(
 ) -> typing.Generator[ReadHitType, typing.Any, None]:
     docs = hits["response"]["docs"]
 
-    paths = [f"../../output/{x["id"]}" for x in docs]
+    for x in docs:
+        yield x
 
-    result = subprocess.Popen(
-        (
-            "rg",
-            "-N",
-            "-H",
-            "--no-heading",
-            "-j",
-            "32",
-            "-a",
-            re.escape(query),
-            *paths
-        ),
-        text=False,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.DEVNULL
-    )
-
-    for line in result.stdout:
-        filename, data = line.split(b":", 1)
-
-        yield ReadHitType(
-            id=filename.decode(),
-            content=data.decode(
-                "utf-8", errors="backslashreplace"
-            ).strip()
-        )
-
-    result.stdout.close()
-    result.wait()
+    # paths = [f"../../output/{x["id"]}" for x in docs]
+    #
+    # result = subprocess.Popen(
+    #     (
+    #         "rg",
+    #         "-N",
+    #         "-H",
+    #         "--no-heading",
+    #         "-j",
+    #         "32",
+    #         "-a",
+    #         re.escape(query),
+    #         *paths
+    #     ),
+    #     text=False,
+    #     stdout=subprocess.PIPE,
+    #     stderr=subprocess.DEVNULL
+    # )
+    #
+    # for line in result.stdout:
+    #     filename, data = line.split(b":", 1)
+    #
+    #     yield ReadHitType(
+    #         id=filename.decode(),
+    #         content=data.decode(
+    #             "utf-8", errors="backslashreplace"
+    #         ).strip()
+    #     )
+    #
+    # result.stdout.close()
+    # result.wait()
 
 # =============================================================================
 
@@ -116,7 +119,7 @@ def fetch_hits(query: str, q: queue.Queue) -> None:
             COLLECTION_URL + "/query",
             params={
                 "q": "*:*",
-                "fq": f"domains:*{query}* OR emails:*{query}* OR ips:*{query}*",
+                "fq": f"domains:*{query}* OR emails:*{query}*",  # OR ips:*{query}*",
                 "fl": "id",
                 "rows": CHUNK_SIZE,
                 "cursorMark": cursor_mark,

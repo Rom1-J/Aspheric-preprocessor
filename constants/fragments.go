@@ -2,6 +2,7 @@ package constants
 
 import (
 	"regexp"
+	"sort"
 	"strings"
 )
 
@@ -13,9 +14,19 @@ var (
 )
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// todo: join on size+letter order
-var DomainPattern = regexp.MustCompile(`([a-zA-Z0-9-.]{1,253}\.(?:` + strings.Join(append(tlds, extraTlds...), "|") + `)\b)`)
+func sortedTLDPattern(allTlds []string) []string {
+	sort.SliceStable(allTlds, func(i, j int) bool {
+		if len(allTlds[i]) == len(allTlds[j]) {
+			return allTlds[i] < allTlds[j]
+		}
+		return len(allTlds[i]) > len(allTlds[j])
+	})
+	return allTlds
+}
+
+var DomainPattern = regexp.MustCompile(`(?i)([a-zA-Z0-9-.]{1,253}\.(?:` + strings.Join(sortedTLDPattern(append(tlds, extraTlds...)), "|") + `)\b)`)
 
 var ipv4Pattern = regexp.MustCompile(`(((25[0-5]|2[0-4]\d|1\d{2}|0?\d{1,2})\b\.){3}(25[0-5]|2[0-4]\d|1\d{2}|0?\d{1,2})\b)`)
 

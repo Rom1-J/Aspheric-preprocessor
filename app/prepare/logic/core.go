@@ -7,6 +7,7 @@ import (
 	"github.com/Rom1-J/preprocessor/pkg/prog"
 	infoproto "github.com/Rom1-J/preprocessor/proto/info"
 	"github.com/jedib0t/go-pretty/v6/progress"
+	ucli "github.com/urfave/cli/v3"
 	"os"
 	"path/filepath"
 	"strings"
@@ -18,7 +19,7 @@ import (
 func PrepareFile(
 	globalProgress prog.ProgressOptsStruct,
 	id string,
-	date string,
+	command *ucli.Command,
 	inputFilePath string,
 	outputDirectoryPath string,
 ) (*infoproto.MetadataInfo, error) {
@@ -79,7 +80,7 @@ func PrepareFile(
 	var metadataInfo *infoproto.MetadataInfo
 
 	if strings.HasSuffix(copiedFilePath, ".compressed") {
-		metadataInfo, err = generator.ProcessCompressedFile(id, date, copiedFilePath)
+		metadataInfo, err = generator.ProcessCompressedFile(id, command, copiedFilePath)
 		if err != nil {
 			var msg = fmt.Sprintf("Failed to process compressed file: %v", err)
 			logger.Logger.Error().Msg(msg)
@@ -90,7 +91,7 @@ func PrepareFile(
 			return nil, err
 		}
 	} else {
-		metadataInfo, err = generator.ProcessUncompressedFile(id, date, copiedFilePath)
+		metadataInfo, err = generator.ProcessUncompressedFile(id, command, copiedFilePath)
 		if err != nil {
 			var msg = fmt.Sprintf("Failed to process text file: %v", err)
 			logger.Logger.Error().Msg(msg)

@@ -7,16 +7,36 @@ import (
 	infoproto "github.com/Rom1-J/preprocessor/proto/info"
 	"github.com/google/uuid"
 	"github.com/segmentio/fasthash/fnv1a"
+	ucli "github.com/urfave/cli/v3"
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-func GenerateForFile(id string, date string, inputFilePath string) (*infoproto.MetadataInfo, error) {
-	logger.Logger.Trace().Msgf("Generating metadata for file %s", inputFilePath)
+func getBucketType(command *ucli.Command) infoproto.Bucket {
+	switch strings.ToLower(command.String("bucket")) {
+	case "leaks.logs":
+		return infoproto.Bucket_LEAKS_LOGS
+	case "leaks.databases":
+		return infoproto.Bucket_LEAKS_DATABASES
+	case "combinations":
+		return infoproto.Bucket_COMBINATIONS
+	case "pastes":
+		return infoproto.Bucket_PASTES
+	default:
+		return infoproto.Bucket_DUMPSTER
+	}
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+func GenerateForFile(id string, command *ucli.Command, inputFilePath string) (*infoproto.MetadataInfo, error) {
+	logger.Logger.Trace().Msgf("Generating metadata info for file %s", inputFilePath)
 
 	// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 	//
@@ -37,7 +57,8 @@ func GenerateForFile(id string, date string, inputFilePath string) (*infoproto.M
 
 	var metadata = infoproto.MetadataInfo{
 		Id:      id,
-		Date:    date,
+		Bucket:  getBucketType(command),
+		Date:    command.String("date"),
 		Path:    []byte(filepath.Base(inputFilePath)),
 		Size:    uint64(fileSize),
 		Simhash: fileSimhash,
@@ -85,7 +106,7 @@ func GenerateForFile(id string, date string, inputFilePath string) (*infoproto.M
 				return nil
 			}
 
-			partMetadata, err := GenerateForFile(uuid.New().String(), date, path)
+			partMetadata, err := GenerateForFile(uuid.New().String(), command, path)
 			if err != nil {
 				return err
 			}
@@ -106,12 +127,12 @@ func GenerateForFile(id string, date string, inputFilePath string) (*infoproto.M
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-func GenerateForDirectory(id string, date string, inputDirectoryPath string) (*infoproto.MetadataInfo, error) {
-	logger.Logger.Trace().Msgf("Generating metadata for directory %s", inputDirectoryPath)
+func GenerateForDirectory(id string, command *ucli.Command, inputDirectoryPath string) (*infoproto.MetadataInfo, error) {
+	logger.Logger.Trace().Msgf("Generating metadata info for directory %s", inputDirectoryPath)
 
 	var metadata = infoproto.MetadataInfo{
 		Id:   id,
-		Date: date,
+		Date: command.String("date"),
 		Path: []byte(filepath.Base(inputDirectoryPath)),
 	}
 
@@ -138,9 +159,9 @@ func GenerateForDirectory(id string, date string, inputDirectoryPath string) (*i
 		var entryMetadata *infoproto.MetadataInfo
 
 		if entry.IsDir() {
-			entryMetadata, err = GenerateForDirectory(uuid.New().String(), date, path)
+			entryMetadata, err = GenerateForDirectory(uuid.New().String(), command, path)
 		} else {
-			entryMetadata, err = GenerateForFile(uuid.New().String(), date, path)
+			entryMetadata, err = GenerateForFile(uuid.New().String(), command, path)
 		}
 
 		if err != nil {

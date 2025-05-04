@@ -2,11 +2,20 @@ syntax = "proto3";
 
 package metadata;
 
+enum Bucket {
+  DUMPSTER = 0;
+  LEAKS_LOGS = 1;
+  LEAKS_DATABASES = 2;
+  COMBINATIONS = 3;
+  PASTES = 4;
+}
+
 message MetadataInfo {
   string id = 1;
   string date = 2;
-  bytes path = 3;
-  uint64 size = 4;
-  uint64 simhash = 5;
-  repeated MetadataInfo children = 6;
+  Bucket bucket = 3;
+  bytes path = 4;
+  uint64 size = 5;
+  uint64 simhash = 6;
+  repeated MetadataInfo children = 7;
 }

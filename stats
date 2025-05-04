@@ -1,0 +1,38 @@
+~/Workspace/Aspheric/preprocessor master +4 !20 ?3 ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── 18:53:18
+❯ find output -type f \( -name '_metadata.pb' -o -name '_info.pb' \) -print0 \
+            | xargs -0 stat --format="%s" \
+            | awk '{total += $1} END {
+      split("B KB MB GB TB", unit);
+      while (total >= 1024 && i < 4) {
+        total /= 1024;
+        i++;
+      }
+      printf "%.2f %s\n", total, unit[i+1];
+    }'
+128.68 GB
+~/Workspace/Aspheric/preprocessor master +4 !20 ?3 ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── 18:53:31
+❯ find output -type f \( -name '_metadata.opti.pb' -o -name '_info.pb' \) -print0 \
+            | xargs -0 stat --format="%s" \
+            | awk '{total += $1} END {
+      split("B KB MB GB TB", unit);
+      while (total >= 1024 && i < 4) {
+        total /= 1024;
+        i++;
+      }
+      printf "%.2f %s\n", total, unit[i+1];
+    }'
+62.33 GB
+~/Workspace/Aspheric/preprocessor master +4 !20 ?3 ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── 18:53:40
+❯ find output -type d -name 'data' -print0 \
+            | xargs -0 du -sb 2>/dev/null \
+            | awk '{total += $1} END {
+      split("B KB MB GB TB", unit);
+      while (total >= 1024 && i < 4) {
+        total /= 1024;
+        i++;
+      }
+      printf "%.2f %s\n", total, unit[i+1];
+    }'
+255.71 GB
+~/Workspace/Aspheric/preprocessor master +4 !20 ?3 ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── 18:53:50
+❯ 

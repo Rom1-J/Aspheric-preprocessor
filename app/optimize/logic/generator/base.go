@@ -1,0 +1,22 @@
+package generator
+
+import (
+	"bytes"
+)
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+func DeduplicateItems(input [][]byte) [][]byte {
+	seen := make(map[string]struct{})
+	var result [][]byte
+
+	for _, b := range input {
+		key := string(b)
+		if _, exists := seen[key]; !exists {
+			result = append(result, bytes.Clone(b))
+			seen[key] = struct{}{}
+		}
+	}
+	return result
+}

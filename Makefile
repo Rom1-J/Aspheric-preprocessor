@@ -11,11 +11,9 @@ ARCH          := x86_64
 URL           := https://github.com/Rom1-J/Aspheric-preprocessor
 DESCRIPTION   := Convert text, csv, sql, .. files into csv.
 BUILDINFOS    := ($(shell date +%FT%T%z)$(BUILDINFOSDET))
-LDFLAGS       := '-X main.version=$(SOFT_VERSION) -X main.buildinfos=$(BUILDINFOS)'
+LDFLAGS       := -X main.version=$(SOFT_VERSION) -X main.buildinfos=$(BUILDINFOS)
 
 OUTPUT_SOFT   := $(DIST_DIR)$(SOFT_NAME)-$(SOFT_VERSION)-$(GOOS)-$(ARCH)$(EXTENSION)
-
-LOGSTASH_PATH := ~/Tools/logstash-8.17.0/bin/logstash
 
 .PHONY: vet
 vet:
@@ -31,11 +29,9 @@ clean:
 
 .PHONY: build
 build: prepare
-	go build -ldflags $(LDFLAGS) -o $(OUTPUT_SOFT)
+	go build -ldflags "$(LDFLAGS)" -o "$(OUTPUT_SOFT)"
 
-.PHONY: logstash
-logstash:
-	$(LOGSTASH_PATH) -f "`realpath confs/logstash.conf`" --pipeline.workers 32
+	go build -ldflags "-s -w -buildid=" -gcflags "-l -B" -trimpath -o "$(OUTPUT_SOFT).smol"
 
 .PHONY: protoc
 protoc:

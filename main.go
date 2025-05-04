@@ -52,6 +52,7 @@ func main() {
 		Commands: []*ucli.Command{
 			cli.Prepare,
 			cli.Extract,
+			cli.Optimize,
 			cli.Populate,
 		},
 	}

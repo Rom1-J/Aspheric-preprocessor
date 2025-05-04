@@ -51,7 +51,6 @@ func Action(ctx context.Context, command *ucli.Command) error {
 	}
 
 	logger.Logger.Debug().Msgf("Input files: %v", inputList)
-
 	logger.Logger.Info().Msgf("Preparing %d files", len(inputList))
 	// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
@@ -124,7 +123,7 @@ func Action(ctx context.Context, command *ucli.Command) error {
 			metadataInfo, err := logic.PrepareFile(
 				globalProgress,
 				id,
-				command.String("date"),
+				command,
 				filePath,
 				outputDirectoryPath,
 			)

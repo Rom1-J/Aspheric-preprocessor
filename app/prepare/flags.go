@@ -45,4 +45,10 @@ var Flags = []ucli.Flag{
 		Value:       now,
 		Required:    false,
 	},
+	&ucli.StringFlag{
+		Name:     "bucket",
+		Usage:    "Bucket type",
+		Value:    "dumpster",
+		Required: false,
+	},
 }
