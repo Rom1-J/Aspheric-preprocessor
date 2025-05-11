@@ -21,12 +21,12 @@ import (
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-func ProcessDirectory(
+func ProcessMetadataPb(
 	globalProgress prog.ProgressOptsStruct,
-	inputDirectory string,
+	inputMetadataPb string,
 	solrOpts structs.SolrOptsStruct,
 ) error {
-	logger.Logger.Trace().Msgf("ProcessDirectory starting on: %s", inputDirectory)
+	logger.Logger.Trace().Msgf("ProcessMetadataPb starting on: %s", inputMetadataPb)
 
 	url := solrOpts.Address +
 		"/" +
@@ -40,7 +40,7 @@ func ProcessDirectory(
 	// Initialize tracker
 	//
 	tracker := progress.Tracker{
-		Message: "Processing directory " + filepath.Base(inputDirectory),
+		Message: "Processing metadata " + filepath.Base(inputMetadataPb),
 		Total:   int64(0),
 	}
 	globalProgress.Pw.AppendTracker(&tracker)
@@ -50,20 +50,18 @@ func ProcessDirectory(
 	//
 	// Open metadata protobuf
 	//
-	metadataFilePath := filepath.Join(inputDirectory, "_metadata.pb")
-
-	metadataData, err := os.ReadFile(metadataFilePath)
+	metadataData, err := os.ReadFile(inputMetadataPb)
 	if err != nil {
-		log.Fatalf("Failed to read metadata file %s: %v", metadataFilePath, err)
+		log.Fatalf("Failed to read metadata file %s: %v", inputMetadataPb, err)
 	}
 
 	metadata := &metadataproto.MetadataList{}
 	err = proto.Unmarshal(metadataData, metadata)
 	if err != nil {
-		log.Fatalf("Failed to unmarshal protobuf data for %s: %v", metadataFilePath, err)
+		log.Fatalf("Failed to unmarshal protobuf data for %s: %v", inputMetadataPb, err)
 	}
 
-	tracker.UpdateMessage(fmt.Sprintf("Processing directory %s (%d items)", filepath.Base(inputDirectory), len(metadata.Items)))
+	tracker.UpdateMessage(fmt.Sprintf("Processing directory %s (%d items)", filepath.Base(inputMetadataPb), len(metadata.Items)))
 	tracker.UpdateTotal(int64(len(metadata.Items)))
 	// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
